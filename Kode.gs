@@ -134,25 +134,6 @@ function getDistanceFromLatLonInM(lat1, lon1, lat2, lon2) {
   return Math.round(R * c);
 }
 
-/**
- * Menghitung selisih menit keterlambatan saat Check-In/Presensi Masuk
- * Shift 1: Target 07:00
- * Shift 2: Target 15:00
- * Shift 3: Target 23:00 (menangani scan setelah tengah malam)
- */
-function calculateCheckInDiff(now, targetHour, shiftName) {
-  let targetTime = new Date(now.getTime());
-  targetTime.setHours(targetHour, 0, 0, 0);
-  
-  // Kasus Shift 3 (Target masuk 23:00):
-  // Jika scan dilakukan dini hari (00:00 - 11:59), target masuknya adalah jam 23:00 kemarin malam
-  if (shiftName === 'Shift 3' && now.getHours() < 12) {
-    targetTime.setDate(targetTime.getDate() - 1);
-  }
-  
-  let diffMs = now.getTime() - targetTime.getTime();
-  return Math.floor(diffMs / 60000); // menit (+ terlambat, - lebih awal)
-}
 
 /**
  * Mengambil daftar nama karyawan aktif dari Master_Karyawan untuk autocomplete di frontend
@@ -327,29 +308,15 @@ function prosesPresensi(inputNamaKaryawan, inputShift, barcodeValidasi, userLat,
       }
     }
     
-    // 6. Hitung Status Keterlambatan Berdasarkan Jam Target Shift yang Dipilih
-    let targetHour = 7;
-    if (targetSheetName === 'Shift 2') targetHour = 15;
-    if (targetSheetName === 'Shift 3') targetHour = 23;
-    
-    let diffMins = calculateCheckInDiff(now, targetHour, targetSheetName);
-    let statusKeterlambatan = 'Tepat Waktu';
-    
-    if (diffMins > 0) {
-      statusKeterlambatan = `Terlambat ${diffMins} Menit`;
-    } else if (diffMins < 0) {
-      statusKeterlambatan = `Lebih Awal ${Math.abs(diffMins)} Menit`;
-    } else {
-      statusKeterlambatan = `Tepat Waktu`;
-    }
+    // 6. Status Kehadiran Fleksibel (Tidak dipengaruhi oleh jam shift, jam berapapun presensi diakui Hadir)
+    const statusPresensi = 'Hadir';
     
     // 7. Simpan Baris Presensi ke Sheet Shift Pilihan Karyawan
-    sheetTarget.appendRow([now, tanggal, waktu, idKaryawanAsli, namaKaryawan, posisiKaryawan, 'Masuk', statusKeterlambatan, distance]);
+    sheetTarget.appendRow([now, tanggal, waktu, idKaryawanAsli, namaKaryawan, posisiKaryawan, 'Masuk', statusPresensi, distance]);
     
-    let infoTambahan = ` (Status: ${statusKeterlambatan})`;
     return { 
       status: 'success', 
-      pesan: `Presensi ${targetSheetName} berhasil disimpan! Semangat bekerja, ${namaKaryawan}.${infoTambahan}` 
+      pesan: `Presensi ${targetSheetName} berhasil disimpan! Semangat bekerja, ${namaKaryawan}.` 
     };
     
   } catch (error) {
@@ -359,7 +326,7 @@ function prosesPresensi(inputNamaKaryawan, inputShift, barcodeValidasi, userLat,
   }
 }
 
-// FUNGSI UNTUK MENGAMBIL DATA KPI DASHBOARD (FOKUS KEHADIRAN & KEDISIPLINAN)
+// FUNGSI UNTUK MENGAMBIL DATA KPI DASHBOARD (FOKUS KEHADIRAN & DISTRIBUSI SHIFT FLEKSIBEL)
 function getKPIData() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const shifts = ['Shift 1', 'Shift 2', 'Shift 3'];
@@ -381,18 +348,18 @@ function getKPIData() {
   let summary = {
     totalKaryawan: totalKaryawanAktif,
     hadirHariIni: 0,
-    terlambatHariIni: 0,
-    tepatWaktuHariIni: 0,
-    awalHariIni: 0
+    shift1HariIni: 0,
+    shift2HariIni: 0,
+    shift3HariIni: 0
   };
   
   let todayDateStr = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'yyyy-MM-dd');
   let hadirSet = new Set();
   
   let chartData = {
-    terlambat: 0,
-    tepatWaktu: 0,
-    awal: 0
+    shift1: 0,
+    shift2: 0,
+    shift3: 0
   };
   
   shifts.forEach((shiftName, idx) => {
@@ -404,23 +371,19 @@ function getKPIData() {
     
     const headers = data[0];
     let idxNama = headers.indexOf('Nama');
-    let idxStatus = headers.indexOf('Waktu Masuk');
-    if (idxStatus === -1) idxStatus = headers.indexOf('Status Masuk');
     let idxTanggal = headers.indexOf('Tanggal');
     
     // Fallback index jika format kolom bergeser
     if (idxNama === -1) idxNama = 4;
-    if (idxStatus === -1) idxStatus = 7;
     if (idxTanggal === -1) idxTanggal = 1;
     
     let currentShiftKey = 'shift' + (idx + 1);
     
     for (let i = 1; i < data.length; i++) {
       let nama = String(data[i][idxNama]).trim();
-      let statusStr = String(data[i][idxStatus]).trim();
       let tanggalRaw = data[i][idxTanggal];
       
-      if (!nama || !statusStr) continue;
+      if (!nama) continue;
       
       let isToday = false;
       let rawTglStr = String(tanggalRaw || '').trim();
@@ -433,26 +396,18 @@ function getKPIData() {
         } catch(e) {}
       }
       
-      if (isToday) hadirSet.add(nama);
+      // Akumulasi total kehadiran per shift untuk grafik distribusi
+      chartData[currentShiftKey] = (chartData[currentShiftKey] || 0) + 1;
       
-      let poin = 0;
-      let match = statusStr.match(/\d+/);
-      let menit = match ? parseInt(match[0], 10) : 0;
-      
-      if (statusStr.includes('Terlambat')) {
-        poin = -menit;
-        chartData.terlambat++;
-        if (isToday) summary.terlambatHariIni++;
-      } else if (statusStr.includes('Lebih Awal')) {
-        poin = 10 + Math.min(menit, 15); // Reward tepat waktu + bonus awal (maks 15 poin)
-        chartData.awal++;
-        if (isToday) summary.awalHariIni++;
-      } else if (statusStr.includes('Tepat Waktu')) {
-        poin = 10; // Reward untuk ketepatan waktu
-        chartData.tepatWaktu++;
-        if (isToday) summary.tepatWaktuHariIni++;
+      if (isToday) {
+        hadirSet.add(nama);
+        if (currentShiftKey === 'shift1') summary.shift1HariIni++;
+        if (currentShiftKey === 'shift2') summary.shift2HariIni++;
+        if (currentShiftKey === 'shift3') summary.shift3HariIni++;
       }
       
+      // Poin kehadiran fleksibel (10 poin tiap kehadiran)
+      let poin = 10;
       kpiStore[currentShiftKey][nama] = (kpiStore[currentShiftKey][nama] || 0) + poin;
       kpiStore.overall[nama] = (kpiStore.overall[nama] || 0) + poin;
     }
@@ -466,7 +421,7 @@ function getKPIData() {
     for (let n in obj) {
       arr.push({ nama: n, poin: obj[n] });
     }
-    // Sort descending (poin tertinggi = paling disiplin)
+    // Sort descending (poin / jumlah kehadiran tertinggi)
     return arr.sort((a, b) => b.poin - a.poin);
   }
   

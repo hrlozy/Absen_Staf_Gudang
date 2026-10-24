@@ -310,26 +310,26 @@
         <i class="ph-fill ph-user-check watermark"></i>
       </div>
       <div class="card stat-card">
-        <span class="label">Tepat Waktu</span>
-        <span class="value" style="color: var(--success)" id="val-tepat">0</span>
-        <i class="ph-fill ph-check-circle watermark"></i>
+        <span class="label">Shift 1 Hari Ini</span>
+        <span class="value" style="color: var(--success)" id="val-shift1">0</span>
+        <i class="ph-fill ph-sun watermark"></i>
       </div>
       <div class="card stat-card">
-        <span class="label">Datang Lebih Awal</span>
-        <span class="value" style="color: #2563eb" id="val-awal">0</span>
-        <i class="ph-fill ph-sparkle watermark"></i>
+        <span class="label">Shift 2 Hari Ini</span>
+        <span class="value" style="color: #2563eb" id="val-shift2">0</span>
+        <i class="ph-fill ph-cloud-sun watermark"></i>
       </div>
       <div class="card stat-card">
-        <span class="label">Terlambat Hari Ini</span>
-        <span class="value" style="color: var(--danger)" id="val-terlambat">0</span>
-        <i class="ph-fill ph-clock-countdown watermark"></i>
+        <span class="label">Shift 3 Hari Ini</span>
+        <span class="value" style="color: #8b5cf6" id="val-shift3">0</span>
+        <i class="ph-fill ph-moon watermark"></i>
       </div>
     </div>
     
     <div class="main-grid">
       <div class="card">
-        <h3><i class="ph-fill ph-chart-pie-slice" style="color: var(--pink)"></i> Distribusi Presensi</h3>
-        <p style="font-size: 12.5px; color: var(--muted); margin-bottom: 12px;">Rasio ketepatan waktu kumulatif staf packing</p>
+        <h3><i class="ph-fill ph-chart-pie-slice" style="color: var(--pink)"></i> Distribusi Shift</h3>
+        <p style="font-size: 12.5px; color: var(--muted); margin-bottom: 12px;">Rasio kehadiran staf berdasarkan shift kerja</p>
         <div class="chart-container">
           <canvas id="kpiChart"></canvas>
         </div>
@@ -338,10 +338,10 @@
       <div class="card" style="padding: 0;">
         <div style="padding: 20px 20px 0 20px;">
           <div class="nav-tabs">
-            <button class="tab-btn active" onclick="switchTab('overall', event)">Keseluruhan</button>
-            <button class="tab-btn" onclick="switchTab('shift1', event)">Shift 1 (07:00 - 15:00)</button>
-            <button class="tab-btn" onclick="switchTab('shift2', event)">Shift 2 (15:00 - 23:00)</button>
-            <button class="tab-btn" onclick="switchTab('shift3', event)">Shift 3 (23:00 - 07:00)</button>
+            <button class="tab-btn active" onclick="switchTab('overall', event)">Semua Shift</button>
+            <button class="tab-btn" onclick="switchTab('shift1', event)">Shift 1</button>
+            <button class="tab-btn" onclick="switchTab('shift2', event)">Shift 2</button>
+            <button class="tab-btn" onclick="switchTab('shift3', event)">Shift 3</button>
           </div>
         </div>
         
@@ -420,9 +420,9 @@
       // Update Summary Cards
       document.getElementById('val-total').innerText = data.summary.totalKaryawan || 0;
       document.getElementById('val-hadir').innerText = data.summary.hadirHariIni || 0;
-      document.getElementById('val-tepat').innerText = data.summary.tepatWaktuHariIni || 0;
-      document.getElementById('val-awal').innerText = data.summary.awalHariIni || 0;
-      document.getElementById('val-terlambat').innerText = data.summary.terlambatHariIni || 0;
+      document.getElementById('val-shift1').innerText = data.summary.shift1HariIni || 0;
+      document.getElementById('val-shift2').innerText = data.summary.shift2HariIni || 0;
+      document.getElementById('val-shift3').innerText = data.summary.shift3HariIni || 0;
       
       // Render Chart
       const ctx = document.getElementById('kpiChart').getContext('2d');
@@ -431,10 +431,10 @@
       chartInstance = new Chart(ctx, {
         type: 'doughnut',
         data: {
-          labels: ['Lebih Awal', 'Tepat Waktu', 'Terlambat'],
+          labels: ['Shift 1', 'Shift 2', 'Shift 3'],
           datasets: [{
-            data: [data.chartData.awal, data.chartData.tepatWaktu, data.chartData.terlambat],
-            backgroundColor: ['#2563eb', '#10b981', '#ef4444'],
+            data: [data.chartData.shift1 || 0, data.chartData.shift2 || 0, data.chartData.shift3 || 0],
+            backgroundColor: ['#10b981', '#2563eb', '#8b5cf6'],
             borderWidth: 2,
             borderColor: '#ffffff',
             hoverOffset: 6
@@ -457,7 +457,7 @@
         }
       });
       
-      // Render Leaderboard Kedisiplinan
+      // Render Leaderboard Kehadiran
       const container = document.getElementById('dashboardContainer');
       container.innerHTML = '';
       
@@ -470,7 +470,7 @@
         
         div.innerHTML = `
           <div>
-            <h3 style="color: var(--pink-dark);"><i class="ph-bold ph-medal"></i> Peringkat Kedisiplinan & Ketepatan Waktu Presensi</h3>
+            <h3 style="color: var(--pink-dark);"><i class="ph-bold ph-medal"></i> Peringkat Kehadiran Presensi</h3>
             <div id="list-leaderboard-${secId}"></div>
           </div>
         `;
