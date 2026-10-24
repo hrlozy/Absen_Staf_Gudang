@@ -292,9 +292,6 @@
         </div>
       </div>
       <div style="display: flex; gap: 10px; align-items: center;">
-        <a href="index.html" class="refresh-btn" style="text-decoration: none;">
-          <i class="ph-bold ph-arrow-left"></i> Form Presensi
-        </a>
         <button class="refresh-btn" onclick="loadData()">
           <i class="ph-bold ph-arrows-clockwise"></i> Refresh Data
         </button>
@@ -368,7 +365,23 @@
     function loadData() {
       document.getElementById('loader').style.display = 'flex';
 
-      // 1. Jika di-hosting di GitHub Pages (pakai fetch GET)
+      // 1. Jika dibuka langsung di Google Apps Script (eksekusi native super cepat tanpa overhead HTTP)
+      if (window.google && google.script && google.script.run) {
+        google.script.run
+          .withSuccessHandler(renderDashboard)
+          .withFailureHandler(err => {
+            document.getElementById('loader').innerHTML = `
+              <div style="text-align: center; padding: 25px;">
+                <p style="color:#e11d48; font-weight:700; font-size:16px;">Terjadi kesalahan server: ${err.message}</p>
+                <button class="refresh-btn" onclick="loadData()" style="margin-top:12px;">Coba Lagi</button>
+              </div>
+            `;
+          })
+          .getKPIData();
+        return;
+      }
+
+      // 2. Jika diakses dari luar / web eksternal (menggunakan fetch GET)
       if (typeof SCRIPT_URL !== 'undefined' && SCRIPT_URL && !SCRIPT_URL.includes("EXAMPLE")) {
         fetch(SCRIPT_URL + "?action=getKPIData")
           .then(res => {
@@ -390,29 +403,14 @@
         return;
       }
 
-      // 2. Fallback jika dibuka langsung di Google Apps Script
-      if (window.google && google.script && google.script.run) {
-        google.script.run
-          .withSuccessHandler(renderDashboard)
-          .withFailureHandler(err => {
-            document.getElementById('loader').innerHTML = `
-              <div style="text-align: center; padding: 25px;">
-                <p style="color:#e11d48; font-weight:700; font-size:16px;">Terjadi kesalahan server: ${err.message}</p>
-                <button class="refresh-btn" onclick="loadData()" style="margin-top:12px;">Coba Lagi</button>
-              </div>
-            `;
-          })
-          .getKPIData();
-      } else {
-        document.getElementById('loader').innerHTML = `
-          <div style="text-align: center; padding: 25px;">
-            <p style="color:#e11d48; font-weight:700; font-size:16px; margin-bottom:8px;">Konfigurasi Belum Selesai</p>
-            <p style="color:#766770; font-size:13.5px; max-width:450px; margin:0 auto;">
-              Buka file <code>dashboard.html</code> lalu ganti variabel <code>SCRIPT_URL</code> dengan link Web App Google Apps Script Anda.
-            </p>
-          </div>
-        `;
-      }
+      document.getElementById('loader').innerHTML = `
+        <div style="text-align: center; padding: 25px;">
+          <p style="color:#e11d48; font-weight:700; font-size:16px; margin-bottom:8px;">Konfigurasi Belum Selesai</p>
+          <p style="color:#766770; font-size:13.5px; max-width:450px; margin:0 auto;">
+            Buka file <code>dashboard.html</code> lalu ganti variabel <code>SCRIPT_URL</code> dengan link Web App Google Apps Script Anda.
+          </p>
+        </div>
+      `;
     }
     
     function renderDashboard(data) {

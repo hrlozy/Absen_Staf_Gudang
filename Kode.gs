@@ -12,27 +12,29 @@ function doGet(e) {
   }
 
   // 2. Tampilan Web App bawaan jika dibuka langsung di Google Apps Script
-  if (e && e.parameter && e.parameter.page && e.parameter.page.toLowerCase() === 'dashboard') {
-    let htmlOutput;
+  // Jika parameter ?page=index diberikan secara eksplisit, baru tampilkan form presensi
+  if (e && e.parameter && e.parameter.page && e.parameter.page.toLowerCase() === 'index') {
+    let htmlIndexOutput;
     try {
-      htmlOutput = HtmlService.createHtmlOutputFromFile('dashboard');
+      htmlIndexOutput = HtmlService.createHtmlOutputFromFile('index');
     } catch(err) {
-      htmlOutput = HtmlService.createHtmlOutputFromFile('Dashboard');
+      htmlIndexOutput = HtmlService.createHtmlOutputFromFile('Index');
     }
-    return htmlOutput
-      .setTitle('Dashboard KPI Kedisiplinan - LOZY PCP')
+    return htmlIndexOutput
+      .setTitle('Presensi PCP Service - LOZY')
       .addMetaTag('viewport', 'width=device-width, initial-scale=1')
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
   }
 
-  let htmlIndexOutput;
+  // Default untuk Google Apps Script: Tampilkan langsung Dashboard KPI Kedisiplinan
+  let htmlOutput;
   try {
-    htmlIndexOutput = HtmlService.createHtmlOutputFromFile('index');
+    htmlOutput = HtmlService.createHtmlOutputFromFile('dashboard');
   } catch(err) {
-    htmlIndexOutput = HtmlService.createHtmlOutputFromFile('Index');
+    htmlOutput = HtmlService.createHtmlOutputFromFile('Dashboard');
   }
-  return htmlIndexOutput
-    .setTitle('Presensi PCP Service - LOZY')
+  return htmlOutput
+    .setTitle('Dashboard KPI Kedisiplinan - LOZY PCP')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
