@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <title>Dashboard KPI Presensi - LOZY PCP</title>
+  <style>
+    :root {
+      --pink: #eb7f97;
+      --pink-dark: #c95e78;
+      --pink-soft: #fff0f3;
+      --peach: #f7b08d;
+      --cream: #fffaf8;
+      --text: #4b3040;
+      --muted: #766770;
+      --line: #f0dfe2;
+      --card-bg: rgba(255, 255, 255, 0.9);
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --shadow: 0 10px 30px rgba(119, 65, 79, 0.06);
+    }
+    
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    body {
+      font-family: "DM Sans", sans-serif;
+      color: var(--text);
+      background: 
+        radial-gradient(circle at 5% 10%, #fde1e6 0 140px, transparent 141px),
+        linear-gradient(135deg, #fffaf8 0%, #fff5f6 100%);
+      min-height: 100vh;
+      padding: 30px 20px;
+    }
+    
+    .container {
+      max-width: 1140px;
+      margin: 0 auto;
+    }
+    
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 25px;
+      flex-wrap: wrap;
+      gap: 15px;
+    }
+    
+    .brand-section {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+    
+    .brand-section img {
+      height: 42px;
+      width: auto;
+    }
+    
+    .header h1 {
+      font-family: "Playfair Display", serif;
+      font-size: 26px;
+      color: var(--text);
+      line-height: 1.2;
+    }
+    
+    .header p {
+      color: var(--muted);
+      font-size: 14px;
+      margin-top: 4px;
+    }
+
+    .refresh-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: white;
+      border: 1px solid var(--line);
+      color: var(--pink-dark);
+      padding: 10px 18px;
+      border-radius: 12px;
+      font-weight: 600;
+      font-size: 13.5px;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(119, 65, 79, 0.04);
+      transition: all 0.2s;
+    }
+    .refresh-btn:hover {
+      background: var(--pink-soft);
+      transform: translateY(-1px);
+    }
+    
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+      margin-bottom: 25px;
+    }
+    
+    .card {
+      background: var(--card-bg);
+      backdrop-filter: blur(8px);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 20px;
+      box-shadow: var(--shadow);
+    }
+    
+    .stat-card {
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      overflow: hidden;
+    }
+    .stat-card .label {
+      font-size: 12.5px;
+      color: var(--muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .stat-card .value {
+      font-size: 30px;
+      font-weight: 700;
+      margin-top: 8px;
+      color: var(--text);
+    }
+    .stat-card i.watermark {
+      position: absolute;
+      right: 15px;
+      bottom: 12px;
+      font-size: 38px;
+      opacity: 0.12;
+      color: var(--text);
+    }
+    
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 25px;
+    }
+    @media (min-width: 992px) {
+      .main-grid {
+        grid-template-columns: 360px 1fr;
+      }
+    }
+    
+    .chart-container {
+      position: relative;
+      height: 280px;
+      width: 100%;
+      margin-top: 10px;
+    }
+    
+    .nav-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--line);
+      margin-bottom: 20px;
+      gap: 8px;
+      overflow-x: auto;
+    }
+    .tab-btn {
+      padding: 12px 18px;
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid transparent;
+      font-family: inherit;
+      font-weight: 600;
+      font-size: 13.5px;
+      color: var(--muted);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.2s;
+    }
+    .tab-btn:hover {
+      color: var(--pink-dark);
+    }
+    .tab-btn.active {
+      color: var(--pink-dark);
+      border-bottom-color: var(--pink);
+    }
+    
+    .dashboard-section {
+      display: none;
+    }
+    .dashboard-section.active {
+      display: block;
+      animation: fadeIn 0.3s ease;
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .card h3 {
+      margin: 0 0 16px 0;
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .list-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 14px;
+      border-bottom: 1px solid #f9ecee;
+      border-radius: 10px;
+      margin-bottom: 6px;
+      background: white;
+      transition: background 0.15s;
+    }
+    .list-item:hover {
+      background: rgba(255, 240, 243, 0.4);
+    }
+    .list-item:last-child {
+      border-bottom: none;
+      margin-bottom: 0;
+    }
+    
+    .rank {
+      width: 32px;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--muted);
+    }
+    .name-block {
+      flex-grow: 1;
+      font-size: 14.5px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .points {
+      font-size: 13px;
+      font-weight: 700;
+      padding: 4px 12px;
+      border-radius: 8px;
+    }
+    .points.plus { 
+      background: #ecfdf5; 
+      color: var(--success); 
+    }
+    .points.minus { 
+      background: #fef2f2; 
+      color: var(--danger); 
+    }
+    
+    .loading-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(255, 250, 248, 0.92);
+      backdrop-filter: blur(6px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    .spinner {
+      border: 4px solid #f0dfe2;
+      width: 44px; height: 44px;
+      border-radius: 50%;
+      border-left-color: var(--pink);
+      animation: spin 0.9s linear infinite;
+    }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+  <div id="loader" class="loading-overlay">
+    <div class="spinner"></div>
+    <p style="margin-top: 15px; font-weight: 600; color: var(--pink-dark);">Menyiapkan Data Analitik Presensi...</p>
+  </div>
+
+  <div class="container">
+    <div class="header">
+      <div class="brand-section">
+        <img src="https://files.catbox.moe/p3hx1g.png" alt="LOZY">
+        <div>
+          <h1>Dashboard KPI Presensi</h1>
+          <p>Kedisiplinan & Rekap Presensi Packing (PCP Service)</p>
+        </div>
+      </div>
+      <div style="display: flex; gap: 10px; align-items: center;">
+        <a href="index.html" class="refresh-btn" style="text-decoration: none;">
+          <i class="ph-bold ph-arrow-left"></i> Form Presensi
+        </a>
+        <button class="refresh-btn" onclick="loadData()">
+          <i class="ph-bold ph-arrows-clockwise"></i> Refresh Data
+        </button>
+      </div>
+    </div>
+    
+    <div class="summary-grid">
+      <div class="card stat-card">
+        <span class="label">Karyawan Aktif</span>
+        <span class="value" id="val-total">0</span>
+        <i class="ph-fill ph-users watermark"></i>
+      </div>
+      <div class="card stat-card">
+        <span class="label">Hadir Hari Ini</span>
+        <span class="value" style="color: var(--pink-dark)" id="val-hadir">0</span>
+        <i class="ph-fill ph-user-check watermark"></i>
+      </div>
+      <div class="card stat-card">
+        <span class="label">Tepat Waktu</span>
+        <span class="value" style="color: var(--success)" id="val-tepat">0</span>
+        <i class="ph-fill ph-check-circle watermark"></i>
+      </div>
+      <div class="card stat-card">
+        <span class="label">Datang Lebih Awal</span>
+        <span class="value" style="color: #2563eb" id="val-awal">0</span>
+        <i class="ph-fill ph-sparkle watermark"></i>
+      </div>
+      <div class="card stat-card">
+        <span class="label">Terlambat Hari Ini</span>
+        <span class="value" style="color: var(--danger)" id="val-terlambat">0</span>
+        <i class="ph-fill ph-clock-countdown watermark"></i>
+      </div>
+    </div>
+    
+    <div class="main-grid">
+      <div class="card">
+        <h3><i class="ph-fill ph-chart-pie-slice" style="color: var(--pink)"></i> Distribusi Presensi</h3>
+        <p style="font-size: 12.5px; color: var(--muted); margin-bottom: 12px;">Rasio ketepatan waktu kumulatif staf packing</p>
+        <div class="chart-container">
+          <canvas id="kpiChart"></canvas>
+        </div>
+      </div>
+      
+      <div class="card" style="padding: 0;">
+        <div style="padding: 20px 20px 0 20px;">
+          <div class="nav-tabs">
+            <button class="tab-btn active" onclick="switchTab('overall', event)">Keseluruhan</button>
+            <button class="tab-btn" onclick="switchTab('shift1', event)">Shift 1 (07:00 - 15:00)</button>
+            <button class="tab-btn" onclick="switchTab('shift2', event)">Shift 2 (15:00 - 23:00)</button>
+            <button class="tab-btn" onclick="switchTab('shift3', event)">Shift 3 (23:00 - 07:00)</button>
+          </div>
+        </div>
+        
+        <div style="padding: 0 20px 20px 20px;" id="dashboardContainer">
+          <!-- Konten Leaderboard Dinamis -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // =========================================================================
+    // KONFIGURASI URL BACKEND GOOGLE APPS SCRIPT
+    // Tempelkan URL Web App Deployment Anda di bawah ini (akhiran /exec):
+    // =========================================================================
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyw4rB59zS_G8E_EXAMPLE/exec";
+
+    let kpiData = {};
+    let chartInstance = null;
+
+    function loadData() {
+      document.getElementById('loader').style.display = 'flex';
+
+      // 1. Jika di-hosting di GitHub Pages (pakai fetch GET)
+      if (typeof SCRIPT_URL !== 'undefined' && SCRIPT_URL && !SCRIPT_URL.includes("EXAMPLE")) {
+        fetch(SCRIPT_URL + "?action=getKPIData")
+          .then(res => {
+            if (!res.ok) throw new Error("HTTP " + res.status);
+            return res.json();
+          })
+          .then(data => renderDashboard(data))
+          .catch(err => {
+            document.getElementById('loader').innerHTML = `
+              <div style="text-align: center; padding: 25px;">
+                <p style="color:#e11d48; font-weight:700; font-size:16px; margin-bottom:8px;">Gagal Mengambil Data KPI</p>
+                <p style="color:#766770; font-size:13.5px; max-width:440px; margin:0 auto 15px auto;">
+                  ${err.message}. Pastikan Web App Google Apps Script telah di-deploy dengan akses <b>"Anyone"</b> dan URL sudah dimasukkan ke variabel <code>SCRIPT_URL</code>.
+                </p>
+                <button class="refresh-btn" onclick="location.reload()">Coba Lagi</button>
+              </div>
+            `;
+          });
+        return;
+      }
+
+      // 2. Fallback jika dibuka langsung di Google Apps Script
+      if (window.google && google.script && google.script.run) {
+        google.script.run
+          .withSuccessHandler(renderDashboard)
+          .withFailureHandler(err => {
+            document.getElementById('loader').innerHTML = `
+              <div style="text-align: center; padding: 25px;">
+                <p style="color:#e11d48; font-weight:700; font-size:16px;">Terjadi kesalahan server: ${err.message}</p>
+                <button class="refresh-btn" onclick="loadData()" style="margin-top:12px;">Coba Lagi</button>
+              </div>
+            `;
+          })
+          .getKPIData();
+      } else {
+        document.getElementById('loader').innerHTML = `
+          <div style="text-align: center; padding: 25px;">
+            <p style="color:#e11d48; font-weight:700; font-size:16px; margin-bottom:8px;">Konfigurasi Belum Selesai</p>
+            <p style="color:#766770; font-size:13.5px; max-width:450px; margin:0 auto;">
+              Buka file <code>dashboard.html</code> lalu ganti variabel <code>SCRIPT_URL</code> dengan link Web App Google Apps Script Anda.
+            </p>
+          </div>
+        `;
+      }
+    }
+    
+    function renderDashboard(data) {
+      document.getElementById('loader').style.display = 'none';
+      kpiData = data;
+      
+      // Update Summary Cards
+      document.getElementById('val-total').innerText = data.summary.totalKaryawan || 0;
+      document.getElementById('val-hadir').innerText = data.summary.hadirHariIni || 0;
+      document.getElementById('val-tepat').innerText = data.summary.tepatWaktuHariIni || 0;
+      document.getElementById('val-awal').innerText = data.summary.awalHariIni || 0;
+      document.getElementById('val-terlambat').innerText = data.summary.terlambatHariIni || 0;
+      
+      // Render Chart
+      const ctx = document.getElementById('kpiChart').getContext('2d');
+      if (chartInstance) chartInstance.destroy();
+      
+      chartInstance = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: ['Lebih Awal', 'Tepat Waktu', 'Terlambat'],
+          datasets: [{
+            data: [data.chartData.awal, data.chartData.tepatWaktu, data.chartData.terlambat],
+            backgroundColor: ['#2563eb', '#10b981', '#ef4444'],
+            borderWidth: 2,
+            borderColor: '#ffffff',
+            hoverOffset: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { 
+              position: 'bottom', 
+              labels: { 
+                usePointStyle: true, 
+                padding: 16,
+                font: { family: 'DM Sans', size: 12.5 }
+              } 
+            }
+          },
+          cutout: '68%'
+        }
+      });
+      
+      // Render Leaderboard Kedisiplinan
+      const container = document.getElementById('dashboardContainer');
+      container.innerHTML = '';
+      
+      const sections = ['overall', 'shift1', 'shift2', 'shift3'];
+      
+      sections.forEach(secId => {
+        const div = document.createElement('div');
+        div.id = 'sec-' + secId;
+        div.className = 'dashboard-section ' + (secId === 'overall' ? 'active' : '');
+        
+        div.innerHTML = `
+          <div>
+            <h3 style="color: var(--pink-dark);"><i class="ph-bold ph-medal"></i> Peringkat Kedisiplinan & Ketepatan Waktu Presensi</h3>
+            <div id="list-leaderboard-${secId}"></div>
+          </div>
+        `;
+        container.appendChild(div);
+        
+        renderList(`list-leaderboard-${secId}`, kpiData.leaderboard[secId]);
+      });
+    }
+    
+    function renderList(elementId, arr) {
+      const el = document.getElementById(elementId);
+      if (!arr || arr.length === 0) {
+        el.innerHTML = '<p style="text-align:center; color:#9ca3af; font-size:13.5px; margin:30px 0;">Belum ada data presensi terekam.</p>';
+        return;
+      }
+      
+      let html = '';
+      arr.forEach((item, index) => {
+        let pointClass = item.poin > 0 ? 'plus' : (item.poin < 0 ? 'minus' : '');
+        let sign = item.poin > 0 ? '+' : '';
+        let medal = '';
+        if (index === 0) medal = '🥇 ';
+        if (index === 1) medal = '🥈 ';
+        if (index === 2) medal = '🥉 ';
+        
+        html += `
+          <div class="list-item">
+            <div class="rank">${index + 1}.</div>
+            <div class="name-block">${medal}${item.nama}</div>
+            <div class="points ${pointClass}">${sign}${item.poin} pts</div>
+          </div>
+        `;
+      });
+      el.innerHTML = html;
+    }
+    
+    function switchTab(tabId, event) {
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      event.target.classList.add('active');
+      
+      document.querySelectorAll('.dashboard-section').forEach(sec => sec.classList.remove('active'));
+      document.getElementById('sec-' + tabId).classList.add('active');
+    }
+    
+    window.onload = loadData;
+  </script>
+</body>
+</html>

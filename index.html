@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Presensi LOZY PCP Service</title>
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <script src="https://unpkg.com/html5-qrcode"></script>
+  
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap');
+
+    :root {
+      --pink: #eb7f97;
+      --pink-dark: #c95e78;
+      --pink-soft: #fff0f3;
+      --peach: #f7b08d;
+      --cream: #fffaf8;
+      --text: #4b3040;
+      --muted: #766770;
+      --line: #f0dfe2;
+      --white: #ffffff;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    body {
+      font-family: "DM Sans", sans-serif;
+      color: var(--text);
+      background: 
+        radial-gradient(circle at 2% 10%, #fde1e6 0 120px, transparent 121px),
+        linear-gradient(135deg, #fffaf8 0%, #fff5f6 100%);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 15px;
+    }
+
+    .brand-logo {
+      margin-bottom: 20px;
+      text-align: center;
+    }
+    
+    .brand-logo img {
+      height: 42px;
+      width: auto;
+    }
+
+    .card {
+      background: rgba(255, 255, 255, 0.94);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      padding: 32px 22px;
+      width: 100%;
+      max-width: 440px;
+      box-shadow: 0 25px 60px rgba(119, 65, 79, 0.08);
+      text-align: center;
+    }
+
+    .eyebrow {
+      color: var(--pink-dark);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+
+    h2 {
+      font-family: "Playfair Display", serif;
+      font-size: 28px;
+      line-height: 1.15;
+      margin-bottom: 8px;
+      color: var(--text);
+    }
+    
+    p.subtitle {
+      color: var(--muted);
+      font-size: 13.5px;
+      margin-bottom: 22px;
+      line-height: 1.4;
+    }
+
+    .input-label {
+      display: block;
+      text-align: left;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 8px;
+    }
+
+    .input-group {
+      position: relative;
+      margin-bottom: 18px;
+    }
+
+    .input-group i {
+      position: absolute;
+      left: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--muted);
+      font-size: 20px;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      padding: 14px 15px 14px 48px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      font-size: 15px;
+      font-family: inherit;
+      color: var(--text);
+      background: white;
+      transition: all 0.2s;
+    }
+
+    input[type="text"]:focus {
+      outline: none;
+      border-color: var(--pink);
+      box-shadow: 0 0 0 3px var(--pink-soft);
+    }
+
+    /* Shift Selector */
+    .shift-selector {
+      margin-bottom: 22px;
+      text-align: left;
+    }
+
+    .shift-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+
+    .shift-option {
+      position: relative;
+      cursor: pointer;
+    }
+
+    .shift-option input[type="radio"] {
+      position: absolute;
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .shift-card {
+      background: white;
+      border: 1.5px solid var(--line);
+      border-radius: 14px;
+      padding: 12px 6px;
+      text-align: center;
+      transition: all 0.2s ease;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .shift-card .title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .shift-card .hours {
+      font-size: 11px;
+      color: var(--muted);
+      font-weight: 500;
+    }
+
+    .shift-option:hover .shift-card {
+      border-color: var(--pink);
+      background: var(--pink-soft);
+    }
+
+    .shift-option input[type="radio"]:checked + .shift-card {
+      border-color: var(--pink);
+      background: var(--pink-soft);
+      box-shadow: 0 4px 14px rgba(235, 127, 151, 0.2);
+    }
+
+    .shift-option input[type="radio"]:checked + .shift-card .title {
+      color: var(--pink-dark);
+    }
+
+    .shift-option input[type="radio"]:checked + .shift-card .hours {
+      color: var(--pink-dark);
+      font-weight: 600;
+    }
+
+    .btn {
+      width: 100%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 15px 20px;
+      border-radius: 14px;
+      font-weight: 600;
+      font-size: 15.5px;
+      border: none;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+
+    .btn-primary { 
+      background: var(--pink); 
+      color: white; 
+      box-shadow: 0 8px 24px rgba(235,127,151,.25);
+    }
+    
+    .btn-primary:hover:not(:disabled) { 
+      transform: translateY(-2px); 
+      background: var(--pink-dark);
+    }
+
+    .btn-secondary {
+      background: #fdf2f4;
+      color: var(--pink-dark);
+      border: 1px solid var(--line);
+      font-size: 14px;
+      padding: 12px 18px;
+    }
+    .btn-secondary:hover {
+      background: #fce7eb;
+    }
+
+    .btn:disabled {
+      background: #e2d5d8;
+      color: #a89a9f;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    .fallback-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 14px;
+      font-size: 13px;
+      color: var(--muted);
+      text-decoration: underline;
+      cursor: pointer;
+      background: none;
+      border: none;
+      font-family: inherit;
+      transition: color 0.2s;
+    }
+    .fallback-link:hover {
+      color: var(--pink-dark);
+    }
+
+    .alert {
+      margin-top: 18px;
+      padding: 14px 16px;
+      border-radius: 14px;
+      font-size: 14px;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      text-align: left;
+      line-height: 1.5;
+      animation: slideIn 0.3s ease;
+      display: none;
+    }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .alert i { font-size: 20px; flex-shrink: 0; }
+    .success { background: #eefbf1; border: 1px solid #b7e4c7; color: #155724; }
+    .success i { color: #2d6a4f; }
+    .error { background: #fff0f3; border: 1px solid #ffccd5; color: #721c24; }
+    .error i { color: #a4133c; }
+    .warning { background: #fff8e6; border: 1px solid #ffe8a1; color: #856404; }
+    .warning i { color: #b0891d; }
+    
+    .time-display {
+      font-family: "DM Sans", sans-serif;
+      font-size: 13px;
+      color: var(--muted);
+      margin-top: 20px;
+      font-weight: 500;
+    }
+
+    /* Modal Live Scanner */
+    .custom-modal {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(35, 18, 26, 0.85);
+      backdrop-filter: blur(8px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 15px;
+      z-index: 9999;
+      animation: fadeIn 0.25s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    .modal-box {
+      background: white;
+      border-radius: 24px;
+      width: 100%;
+      max-width: 410px;
+      padding: 24px 20px;
+      text-align: center;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.35);
+      position: relative;
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+
+    .modal-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .modal-close-btn {
+      background: #f7ebed;
+      border: none;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text);
+      cursor: pointer;
+      font-size: 18px;
+      transition: all 0.2s;
+    }
+    .modal-close-btn:hover {
+      background: #f0dfe2;
+      color: var(--pink-dark);
+    }
+
+    /* Live Scanner View */
+    .scanner-view-container {
+      position: relative;
+      width: 100%;
+      border-radius: 18px;
+      overflow: hidden;
+      background: #111;
+      min-height: 270px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: inset 0 0 20px rgba(0,0,0,0.6);
+    }
+
+    #reader {
+      width: 100% !important;
+      min-height: 270px;
+      border: none !important;
+    }
+
+    #reader video {
+      width: 100% !important;
+      height: 270px !important;
+      object-fit: cover !important;
+      border-radius: 18px;
+    }
+
+    .scanner-laser {
+      position: absolute;
+      top: 15%;
+      left: 8%;
+      right: 8%;
+      height: 3px;
+      background: linear-gradient(90deg, transparent, #eb7f97, #ff3b68, #eb7f97, transparent);
+      box-shadow: 0 0 14px #ff3b68;
+      border-radius: 50%;
+      pointer-events: none;
+      animation: laserScan 2s infinite ease-in-out;
+      z-index: 10;
+    }
+
+    @keyframes laserScan {
+      0% { top: 15%; opacity: 0.7; }
+      50% { top: 85%; opacity: 1; }
+      100% { top: 15%; opacity: 0.7; }
+    }
+
+    .scanner-tip {
+      font-size: 13px;
+      color: var(--muted);
+      margin: 14px 0 12px 0;
+      line-height: 1.4;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="brand-logo">
+    <img src="https://files.catbox.moe/p3hx1g.png" alt="LOZY">
+  </div>
+
+  <div class="card">
+    <div class="eyebrow">PCP Service</div>
+    <h2>Presensi Packing</h2>
+    <p class="subtitle">Ketik nama Anda, pilih shift kerja hari ini, lalu scan barcode validasi dengan kamera live.</p>
+
+    <!-- 1. Input Nama Karyawan dengan Autocomplete -->
+    <label class="input-label" for="idInput">Nama Karyawan:</label>
+    <div class="input-group">
+      <i class="ph-bold ph-user"></i>
+      <input type="text" id="idInput" list="karyawanList" placeholder="Ketik / pilih Nama Anda" autocomplete="off" />
+      <datalist id="karyawanList"></datalist>
+    </div>
+
+    <!-- 2. Wajib Pilih Shift -->
+    <div class="shift-selector">
+      <label class="input-label">Pilih Shift Kerja (Wajib):</label>
+      <div class="shift-grid">
+        <label class="shift-option">
+          <input type="radio" name="shiftRadio" value="Shift 1">
+          <div class="shift-card">
+            <span class="title">Shift 1</span>
+            <span class="hours">07:00-15:00</span>
+          </div>
+        </label>
+        
+        <label class="shift-option">
+          <input type="radio" name="shiftRadio" value="Shift 2">
+          <div class="shift-card">
+            <span class="title">Shift 2</span>
+            <span class="hours">15:00-23:00</span>
+          </div>
+        </label>
+        
+        <label class="shift-option">
+          <input type="radio" name="shiftRadio" value="Shift 3">
+          <div class="shift-card">
+            <span class="title">Shift 3</span>
+            <span class="hours">23:00-07:00</span>
+          </div>
+        </label>
+      </div>
+    </div>
+
+    <!-- 3. Tombol Utama Scan Barcode -->
+    <button id="btnScan" class="btn btn-primary" onclick="bukaLiveScanner()">
+      <i class="ph-bold ph-camera"></i> Scan Barcode (Live Camera)
+    </button>
+
+    <!-- Fallback Foto Manual jika kamera bermasalah di perangkat lama -->
+    <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display: none;" onchange="prosesFotoFallback(event)">
+    <button type="button" class="fallback-link" onclick="bukaFotoFallback()">
+      <i class="ph-bold ph-image"></i> Kamera live terkendala? Gunakan foto manual
+    </button>
+
+    <!-- Alert Notifikasi Hasil -->
+    <div id="output" class="alert">
+      <i id="alertIcon" class="ph-fill ph-check-circle"></i>
+      <div id="alertMessage"></div>
+    </div>
+    
+    <div class="time-display" id="clock">
+      Memuat waktu...
+    </div>
+
+    <div style="margin-top: 18px; border-top: 1px solid var(--line); padding-top: 14px;">
+      <a href="dashboard.html" style="font-size: 13.5px; color: var(--pink-dark); text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 5px;">
+        <i class="ph-bold ph-chart-line-up"></i> Buka Dashboard KPI Presensi &rarr;
+      </a>
+    </div>
+  </div>
+
+  <!-- MODAL LIVE CAMERA SCANNER VIEW -->
+  <div id="scannerModal" class="custom-modal" style="display: none;">
+    <div class="modal-box">
+      <div class="modal-header">
+        <span class="modal-title">
+          <i class="ph-bold ph-scan" style="color: var(--pink)"></i> Arahkan ke Barcode
+        </span>
+        <button class="modal-close-btn" onclick="tutupLiveScanner()">
+          <i class="ph-bold ph-x"></i>
+        </button>
+      </div>
+      
+      <div class="scanner-view-container">
+        <div id="reader"></div>
+        <div class="scanner-laser"></div>
+      </div>
+      
+      <p class="scanner-tip">
+        Posisikan Barcode atau QR Code tepat di tengah area kamera. Scanner membaca otomatis secara real-time.
+      </p>
+      
+      <button class="btn btn-secondary" onclick="tutupLiveScanner()">
+        <i class="ph-bold ph-x-circle"></i> Tutup Kamera
+      </button>
+    </div>
+  </div>
+
+  <script>
+    // =========================================================================
+    // KONFIGURASI URL BACKEND GOOGLE APPS SCRIPT
+    // Tempelkan URL Web App Deployment Anda di bawah ini (akhiran /exec):
+    // =========================================================================
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyw4rB59zS_G8E_EXAMPLE/exec";
+
+    // Live Clock
+    function updateClock() {
+      const now = new Date();
+      const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' };
+      document.getElementById('clock').innerHTML = now.toLocaleDateString('id-ID', options);
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // Sound Beep saat scan berhasil (Web Audio API murni)
+    function playBeep() {
+      try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return;
+        const ctx = new AudioContext();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, ctx.currentTime);
+        gain.gain.setValueAtTime(0.25, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.15);
+      } catch(e) {}
+    }
+
+    // Ambil daftar nama karyawan dari database Master untuk autocomplete
+    function muatDaftarKaryawan() {
+      // 1. Jika dijalankan di GitHub Pages (pakai fetch)
+      if (SCRIPT_URL && !SCRIPT_URL.includes("EXAMPLE")) {
+        fetch(SCRIPT_URL + "?action=getKaryawan")
+          .then(res => res.json())
+          .then(list => pasangDatalist(list))
+          .catch(err => console.warn("Fetch getKaryawan error:", err));
+        return;
+      }
+
+      // 2. Jika dijalankan langsung di dalam Google Apps Script (fallback)
+      if (window.google && google.script && google.script.run) {
+        google.script.run
+          .withSuccessHandler(pasangDatalist)
+          .getDaftarKaryawan();
+      }
+    }
+
+    function pasangDatalist(list) {
+      if (Array.isArray(list) && list.length > 0) {
+        const dl = document.getElementById('karyawanList');
+        if (dl) {
+          dl.innerHTML = list.map(nama => '<option value="' + nama + '">').join('');
+        }
+      }
+    }
+    window.addEventListener('DOMContentLoaded', muatDaftarKaryawan);
+
+    // Helper mengambil nilai shift yang dipilih
+    function getSelectedShift() {
+      const selected = document.querySelector('input[name="shiftRadio"]:checked');
+      return selected ? selected.value : '';
+    }
+
+    // Geolocation Setup
+    let userLat = null;
+    let userLng = null;
+
+    if (navigator.geolocation) {
+      navigator.geolocation.watchPosition(
+        function(position) {
+          userLat = position.coords.latitude;
+          userLng = position.coords.longitude;
+        },
+        function(error) {
+          console.warn("GPS belum didapatkan: " + error.message);
+        },
+        { 
+          enableHighAccuracy: true,
+          maximumAge: 0,
+          timeout: 15000
+        }
+      );
+    }
+
+    // Trigger enter on input nama
+    document.getElementById("idInput").addEventListener("keypress", function(event) {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        bukaLiveScanner();
+      }
+    });
+
+    function validasiFormSebelumScan() {
+      const id = document.getElementById('idInput').value.trim();
+      const shift = getSelectedShift();
+      const output = document.getElementById('output');
+      const alertMessage = document.getElementById('alertMessage');
+      const alertIcon = document.getElementById('alertIcon');
+
+      if (!id) {
+        output.className = 'alert error';
+        alertIcon.className = 'ph-fill ph-warning-circle';
+        alertMessage.innerText = 'Mohon ketik atau pilih Nama Anda terlebih dahulu.';
+        output.style.display = 'flex';
+        document.getElementById('idInput').focus();
+        return false;
+      }
+
+      if (!shift) {
+        output.className = 'alert error';
+        alertIcon.className = 'ph-fill ph-warning-circle';
+        alertMessage.innerText = 'Wajib memilih Shift (Shift 1, Shift 2, atau Shift 3) terlebih dahulu!';
+        output.style.display = 'flex';
+        return false;
+      }
+
+      output.style.display = 'none';
+      return true;
+    }
+
+    // ==========================================================
+    // LOGIKA LIVE CAMERA SCANNER
+    // Di GitHub Pages (domain top-level HTTPS), kamera live
+    // berjalan 100% lancar tanpa hambatan sandbox iframe Google!
+    // ==========================================================
+    let html5QrScannerInstance = null;
+
+    function bukaLiveScanner() {
+      if (!validasiFormSebelumScan()) return;
+
+      const modal = document.getElementById('scannerModal');
+      modal.style.display = 'flex';
+
+      // Beri jeda agar layout modal rendered sehingga viewport reader terhitung presisi
+      setTimeout(function() {
+        if (html5QrScannerInstance) {
+          try { html5QrScannerInstance.clear(); } catch(e) {}
+        }
+
+        try {
+          html5QrScannerInstance = new Html5Qrcode("reader", {
+            experimentalFeatures: {
+              useBarCodeDetectorIfSupported: true
+            }
+          });
+        } catch(e) {
+          html5QrScannerInstance = new Html5Qrcode("reader");
+        }
+
+        const config = {
+          fps: 15,
+          qrbox: function(viewfinderWidth, viewfinderHeight) {
+            const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+            const boxWidth = Math.floor(minEdge * 0.85);
+            const boxHeight = Math.floor(boxWidth * 0.65);
+            return { width: Math.max(200, boxWidth), height: Math.max(140, boxHeight) };
+          }
+        };
+
+        function onScanSuccess(decodedText) {
+          playBeep();
+          tutupLiveScanner();
+          kirimPresensi(decodedText);
+        }
+
+        // Coba kamera belakang (environment) terlebih dahulu
+        html5QrScannerInstance.start(
+          { facingMode: "environment" },
+          config,
+          onScanSuccess,
+          function() {}
+        ).catch(function(errBack) {
+          console.warn("Kamera belakang tidak ditemukan, mencoba kamera default:", errBack);
+          // Fallback coba kamera user / webcam
+          html5QrScannerInstance.start(
+            { facingMode: "user" },
+            config,
+            onScanSuccess,
+            function() {}
+          ).catch(function(errFront) {
+            tutupLiveScanner();
+            const output = document.getElementById('output');
+            const alertMessage = document.getElementById('alertMessage');
+            const alertIcon = document.getElementById('alertIcon');
+            output.className = 'alert error';
+            alertIcon.className = 'ph-fill ph-warning-circle';
+            output.style.display = 'flex';
+            alertMessage.innerText = 'Tidak dapat mengakses kamera: ' + (errFront.message || 'Izin kamera ditolak. Silakan izinkan akses kamera pada notifikasi browser.');
+          });
+        });
+      }, 100);
+    }
+
+    async function tutupLiveScanner() {
+      const modal = document.getElementById('scannerModal');
+      if (modal) modal.style.display = 'none';
+
+      if (html5QrScannerInstance) {
+        try {
+          if (html5QrScannerInstance.isScanning) {
+            await html5QrScannerInstance.stop();
+          }
+          html5QrScannerInstance.clear();
+        } catch(e) {
+          console.warn("Stop scanner error:", e);
+        }
+        html5QrScannerInstance = null;
+      }
+    }
+
+    // ==========================================================
+    // FALLBACK UPLOAD FOTO (DENGAN RESIZE OTOMATIS)
+    // ==========================================================
+    function bukaFotoFallback() {
+      if (!validasiFormSebelumScan()) return;
+      document.getElementById('cameraInput').click();
+    }
+
+    function prosesFotoFallback(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const output = document.getElementById('output');
+      const alertMessage = document.getElementById('alertMessage');
+      const alertIcon = document.getElementById('alertIcon');
+      output.style.display = 'flex';
+      output.className = 'alert warning';
+      alertIcon.className = 'ph-bold ph-spinner ph-spin';
+      alertMessage.innerText = 'Mengoptimalkan dan membaca foto barcode...';
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const img = new Image();
+        img.onload = function() {
+          const maxDim = 1000;
+          let w = img.width;
+          let h = img.height;
+          if (w > maxDim || h > maxDim) {
+            if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; }
+            else { w = Math.round((w * maxDim) / h); h = maxDim; }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, w, h);
+
+          canvas.toBlob(function(blob) {
+            const optimizedFile = new File([blob], "scan.jpg", { type: "image/jpeg" });
+            const qrScanner = new Html5Qrcode("reader");
+            qrScanner.scanFile(optimizedFile, true)
+              .then(decodedText => {
+                playBeep();
+                document.getElementById('cameraInput').value = "";
+                kirimPresensi(decodedText);
+              })
+              .catch(err => {
+                document.getElementById('cameraInput').value = "";
+                output.className = 'alert error';
+                alertIcon.className = 'ph-fill ph-warning-circle';
+                alertMessage.innerText = 'Barcode tidak terdeteksi pada foto. Silakan coba kembali dengan posisi lebih dekat.';
+              });
+          }, 'image/jpeg', 0.88);
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // ==========================================================
+    // PENGIRIMAN DATA PRESENSI
+    // Bekerja fleksibel via fetch() di GitHub Pages atau google.script.run di Apps Script
+    // ==========================================================
+    function kirimPresensi(barcode) {
+      const idInput = document.getElementById('idInput');
+      const id = idInput.value.trim();
+      const shift = getSelectedShift();
+      
+      const output = document.getElementById('output');
+      const alertMessage = document.getElementById('alertMessage');
+      const alertIcon = document.getElementById('alertIcon');
+
+      if (!id || !shift || !barcode) {
+        validasiFormSebelumScan();
+        return;
+      }
+
+      if (userLat === null || userLng === null) {
+        output.className = 'alert warning';
+        alertIcon.className = 'ph-fill ph-spinner ph-spin';
+        alertMessage.innerText = 'Mencari sinyal GPS Anda... Pastikan izin Lokasi/GPS aktif.';
+        output.style.display = 'flex';
+        
+        navigator.geolocation.getCurrentPosition(
+          function(p) { 
+            userLat = p.coords.latitude; 
+            userLng = p.coords.longitude; 
+            kirimPresensi(barcode); 
+          },
+          function(e) { 
+            alertMessage.innerText = 'Gagal mengakses GPS: Harap izinkan akses lokasi di browser.'; 
+          }
+        );
+        return;
+      }
+
+      // Loading state
+      output.style.display = 'flex';
+      output.className = 'alert warning';
+      alertIcon.className = 'ph-bold ph-spinner ph-spin';
+      alertMessage.innerText = 'Sedang memproses presensi ke ' + shift + '...';
+
+      const payload = {
+        action: 'presensi',
+        nama: id,
+        shift: shift,
+        barcode: barcode,
+        lat: userLat,
+        lng: userLng
+      };
+
+      // 1. JIKA RUN DI GITHUB PAGES (Menggunakan fetch HTTP POST)
+      if (SCRIPT_URL && !SCRIPT_URL.includes("EXAMPLE")) {
+        fetch(SCRIPT_URL, {
+          method: 'POST',
+          body: JSON.stringify(payload)
+        })
+        .then(res => res.json())
+        .then(res => tanganiHasilPresensi(res))
+        .catch(error => {
+          output.style.display = 'flex';
+          output.className = 'alert error';
+          alertIcon.className = 'ph-fill ph-x-circle';
+          alertMessage.innerText = 'Gagal terhubung ke server: ' + error.message;
+        });
+        return;
+      }
+
+      // 2. JIKA RUN DI DALAM GOOGLE APPS SCRIPT
+      if (window.google && google.script && google.script.run) {
+        google.script.run
+          .withSuccessHandler(tanganiHasilPresensi)
+          .withFailureHandler(function(error) {
+            output.style.display = 'flex';
+            output.className = 'alert error';
+            alertIcon.className = 'ph-fill ph-x-circle';
+            alertMessage.innerText = 'Gagal terhubung ke server: ' + error.message;
+          })
+          .prosesPresensi(id, shift, barcode, userLat, userLng);
+      } else {
+        output.style.display = 'flex';
+        output.className = 'alert error';
+        alertIcon.className = 'ph-fill ph-warning-circle';
+        alertMessage.innerText = 'Konfigurasi Belum Selesai: Harap isi variabel SCRIPT_URL dengan link Deployment Web App Google Apps Script Anda pada file index.html.';
+      }
+    }
+
+    function tanganiHasilPresensi(res) {
+      const output = document.getElementById('output');
+      const alertMessage = document.getElementById('alertMessage');
+      const alertIcon = document.getElementById('alertIcon');
+      const idInput = document.getElementById('idInput');
+
+      output.style.display = 'flex';
+      output.className = 'alert ' + res.status;
+      alertMessage.innerText = res.pesan;
+      
+      if (res.status === 'success') {
+        alertIcon.className = 'ph-fill ph-check-circle';
+        idInput.value = '';
+        
+        const radios = document.querySelectorAll('input[name="shiftRadio"]');
+        radios.forEach(r => r.checked = false);
+        
+        idInput.focus();
+      } else if (res.status === 'warning') {
+        alertIcon.className = 'ph-fill ph-warning';
+        idInput.value = '';
+        const radios = document.querySelectorAll('input[name="shiftRadio"]');
+        radios.forEach(r => r.checked = false);
+        idInput.focus();
+      } else {
+        alertIcon.className = 'ph-fill ph-x-circle';
+      }
+    }
+  </script>
+</body>
+</html>
