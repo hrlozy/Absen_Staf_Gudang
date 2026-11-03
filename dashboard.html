@@ -14,12 +14,14 @@
       --pink-dark: #c95e78;
       --pink-soft: #fff0f3;
       --peach: #f7b08d;
+      --peach-dark: #c45a27;
       --cream: #fffaf8;
       --text: #4b3040;
       --muted: #766770;
       --line: #f0dfe2;
-      --card-bg: rgba(255, 255, 255, 0.9);
+      --card-bg: rgba(255, 255, 255, 0.92);
       --success: #10b981;
+      --success-soft: #ecfdf5;
       --warning: #f59e0b;
       --danger: #ef4444;
       --shadow: 0 10px 30px rgba(119, 65, 79, 0.06);
@@ -38,7 +40,7 @@
     }
     
     .container {
-      max-width: 1140px;
+      max-width: 1200px;
       margin: 0 auto;
     }
     
@@ -75,14 +77,21 @@
       margin-top: 4px;
     }
 
-    .refresh-btn {
+    .header-actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .btn-action {
       display: inline-flex;
       align-items: center;
       gap: 6px;
       background: white;
       border: 1px solid var(--line);
       color: var(--pink-dark);
-      padding: 10px 18px;
+      padding: 10px 16px;
       border-radius: 12px;
       font-weight: 600;
       font-size: 13.5px;
@@ -90,14 +99,24 @@
       box-shadow: 0 4px 12px rgba(119, 65, 79, 0.04);
       transition: all 0.2s;
     }
-    .refresh-btn:hover {
+    .btn-action:hover {
       background: var(--pink-soft);
       transform: translateY(-1px);
+    }
+
+    .btn-export {
+      background: var(--pink);
+      color: white;
+      border: none;
+    }
+    .btn-export:hover {
+      background: var(--pink-dark);
+      color: white;
     }
     
     .summary-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
       gap: 16px;
       margin-bottom: 25px;
     }
@@ -118,14 +137,14 @@
       overflow: hidden;
     }
     .stat-card .label {
-      font-size: 12.5px;
+      font-size: 12px;
       color: var(--muted);
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.05em;
     }
     .stat-card .value {
-      font-size: 30px;
+      font-size: 28px;
       font-weight: 700;
       margin-top: 8px;
       color: var(--text);
@@ -143,6 +162,7 @@
       display: grid;
       grid-template-columns: 1fr;
       gap: 25px;
+      margin-bottom: 25px;
     }
     @media (min-width: 992px) {
       .main-grid {
@@ -249,9 +269,62 @@
       background: #ecfdf5; 
       color: var(--success); 
     }
-    .points.minus { 
-      background: #fef2f2; 
-      color: var(--danger); 
+
+    /* Tabel Log Presensi Hari Ini */
+    .table-container {
+      overflow-x: auto;
+      margin-top: 15px;
+    }
+
+    table.data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13.5px;
+      text-align: left;
+    }
+
+    table.data-table th {
+      padding: 12px 14px;
+      background: #fff0f3;
+      color: var(--pink-dark);
+      font-weight: 700;
+      border-bottom: 1.5px solid var(--line);
+    }
+
+    table.data-table td {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      background: white;
+      color: var(--text);
+    }
+
+    table.data-table tr:hover td {
+      background: #fffafb;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .badge-masuk {
+      background: #ecfdf5;
+      color: #065f46;
+      border: 1px solid #a7f3d0;
+    }
+    .badge-pulang {
+      background: #fff7ed;
+      color: #9a3412;
+      border: 1px solid #fed7aa;
+    }
+    .badge-shift {
+      background: #f3f4f6;
+      color: #374151;
+      border: 1px solid #e5e7eb;
     }
     
     .loading-overlay {
@@ -273,6 +346,20 @@
       animation: spin 0.9s linear infinite;
     }
     @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+    .search-input {
+      padding: 8px 14px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      font-size: 13px;
+      font-family: inherit;
+      width: 240px;
+      outline: none;
+    }
+    .search-input:focus {
+      border-color: var(--pink);
+      box-shadow: 0 0 0 2px var(--pink-soft);
+    }
   </style>
 </head>
 <body>
@@ -283,6 +370,7 @@
   </div>
 
   <div class="container">
+    <!-- Header -->
     <div class="header">
       <div class="brand-section">
         <img src="https://files.catbox.moe/p3hx1g.png" alt="LOZY">
@@ -291,13 +379,17 @@
           <p>Kedisiplinan & Rekap Presensi Packing (PCP Service)</p>
         </div>
       </div>
-      <div style="display: flex; gap: 10px; align-items: center;">
-        <button class="refresh-btn" onclick="loadData()">
-          <i class="ph-bold ph-arrows-clockwise"></i> Refresh Data
+      <div class="header-actions">
+        <button class="btn-action" onclick="loadData()">
+          <i class="ph-bold ph-arrows-clockwise"></i> Refresh
+        </button>
+        <button class="btn-action btn-export" onclick="exportDataCSV()">
+          <i class="ph-bold ph-download-simple"></i> Export CSV
         </button>
       </div>
     </div>
-    
+
+    <!-- Summary Cards -->
     <div class="summary-grid">
       <div class="card stat-card">
         <span class="label">Karyawan Aktif</span>
@@ -308,6 +400,11 @@
         <span class="label">Hadir Hari Ini</span>
         <span class="value" style="color: var(--pink-dark)" id="val-hadir">0</span>
         <i class="ph-fill ph-user-check watermark"></i>
+      </div>
+      <div class="card stat-card">
+        <span class="label">Pulang Hari Ini</span>
+        <span class="value" style="color: var(--peach-dark)" id="val-pulang">0</span>
+        <i class="ph-fill ph-sign-out watermark"></i>
       </div>
       <div class="card stat-card">
         <span class="label">Shift 1 Hari Ini</span>
@@ -326,6 +423,7 @@
       </div>
     </div>
     
+    <!-- Main Section: Chart & Leaderboard -->
     <div class="main-grid">
       <div class="card">
         <h3><i class="ph-fill ph-chart-pie-slice" style="color: var(--pink)"></i> Distribusi Shift</h3>
@@ -346,8 +444,40 @@
         </div>
         
         <div style="padding: 0 20px 20px 20px;" id="dashboardContainer">
-          <!-- Konten Leaderboard Dinamis -->
+          <!-- Leaderboard Dinamis -->
         </div>
+      </div>
+    </div>
+
+    <!-- Section: Log Aktivitas Presensi Hari Ini -->
+    <div class="card" style="margin-top: 15px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 12px;">
+        <div>
+          <h3 style="margin: 0;"><i class="ph-bold ph-clock-counter-clockwise" style="color: var(--pink)"></i> Log Presensi Hari Ini</h3>
+          <p style="font-size: 12.5px; color: var(--muted); margin-top: 3px;">Riwayat check-in & check-out staf packing secara real-time</p>
+        </div>
+        <input type="text" id="searchInput" class="search-input" placeholder="Cari nama staf..." onkeyup="filterLogTable()">
+      </div>
+
+      <div class="table-container">
+        <table class="data-table" id="logTable">
+          <thead>
+            <tr>
+              <th>Waktu</th>
+              <th>Nama Karyawan</th>
+              <th>Posisi</th>
+              <th>Shift</th>
+              <th>Tipe</th>
+              <th>Status</th>
+              <th>Jarak</th>
+            </tr>
+          </thead>
+          <tbody id="logTableBody">
+            <tr>
+              <td colspan="7" style="text-align: center; color: var(--muted); padding: 25px;">Memuat data aktivitas...</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
   </div>
@@ -355,7 +485,6 @@
   <script>
     // =========================================================================
     // KONFIGURASI URL BACKEND GOOGLE APPS SCRIPT
-    // Tempelkan URL Web App Deployment Anda di bawah ini (akhiran /exec):
     // =========================================================================
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyOzdmQ7CjwBqlIAAi23pX6poNpKDyIaUH6eE4yyPmUCXS5otqSuY01b3wYY-dr7eanLg/exec";
 
@@ -365,7 +494,7 @@
     function loadData() {
       document.getElementById('loader').style.display = 'flex';
 
-      // 1. Jika dibuka langsung di Google Apps Script (eksekusi native super cepat tanpa overhead HTTP)
+      // 1. Eksekusi native di dalam Google Apps Script
       if (window.google && google.script && google.script.run) {
         google.script.run
           .withSuccessHandler(renderDashboard)
@@ -373,7 +502,7 @@
             document.getElementById('loader').innerHTML = `
               <div style="text-align: center; padding: 25px;">
                 <p style="color:#e11d48; font-weight:700; font-size:16px;">Terjadi kesalahan server: ${err.message}</p>
-                <button class="refresh-btn" onclick="loadData()" style="margin-top:12px;">Coba Lagi</button>
+                <button class="btn-action" onclick="loadData()" style="margin-top:12px;">Coba Lagi</button>
               </div>
             `;
           })
@@ -381,7 +510,7 @@
         return;
       }
 
-      // 2. Jika diakses dari luar / web eksternal (menggunakan fetch GET)
+      // 2. Eksekusi via HTTP GET (GitHub Pages / Hosting Web)
       if (typeof SCRIPT_URL !== 'undefined' && SCRIPT_URL && !SCRIPT_URL.includes("EXAMPLE")) {
         fetch(SCRIPT_URL + "?action=getKPIData")
           .then(res => {
@@ -394,9 +523,9 @@
               <div style="text-align: center; padding: 25px;">
                 <p style="color:#e11d48; font-weight:700; font-size:16px; margin-bottom:8px;">Gagal Mengambil Data KPI</p>
                 <p style="color:#766770; font-size:13.5px; max-width:440px; margin:0 auto 15px auto;">
-                  ${err.message}. Pastikan Web App Google Apps Script telah di-deploy dengan akses <b>"Anyone"</b> dan URL sudah dimasukkan ke variabel <code>SCRIPT_URL</code>.
+                  ${err.message}. Pastikan Web App Google Apps Script telah di-deploy dengan akses <b>"Anyone"</b>.
                 </p>
-                <button class="refresh-btn" onclick="location.reload()">Coba Lagi</button>
+                <button class="btn-action" onclick="location.reload()">Coba Lagi</button>
               </div>
             `;
           });
@@ -407,7 +536,7 @@
         <div style="text-align: center; padding: 25px;">
           <p style="color:#e11d48; font-weight:700; font-size:16px; margin-bottom:8px;">Konfigurasi Belum Selesai</p>
           <p style="color:#766770; font-size:13.5px; max-width:450px; margin:0 auto;">
-            Buka file <code>dashboard.html</code> lalu ganti variabel <code>SCRIPT_URL</code> dengan link Web App Google Apps Script Anda.
+            Masukkan URL Web App Deployment Google Apps Script ke variabel <code>SCRIPT_URL</code>.
           </p>
         </div>
       `;
@@ -420,11 +549,12 @@
       // Update Summary Cards
       document.getElementById('val-total').innerText = data.summary.totalKaryawan || 0;
       document.getElementById('val-hadir').innerText = data.summary.hadirHariIni || 0;
+      document.getElementById('val-pulang').innerText = data.summary.pulangHariIni || 0;
       document.getElementById('val-shift1').innerText = data.summary.shift1HariIni || 0;
       document.getElementById('val-shift2').innerText = data.summary.shift2HariIni || 0;
       document.getElementById('val-shift3').innerText = data.summary.shift3HariIni || 0;
       
-      // Render Chart
+      // Render Doughnut Chart
       const ctx = document.getElementById('kpiChart').getContext('2d');
       if (chartInstance) chartInstance.destroy();
       
@@ -457,7 +587,7 @@
         }
       });
       
-      // Render Leaderboard Kehadiran
+      // Render Leaderboard Tabs
       const container = document.getElementById('dashboardContainer');
       container.innerHTML = '';
       
@@ -478,6 +608,9 @@
         
         renderList(`list-leaderboard-${secId}`, kpiData.leaderboard[secId]);
       });
+
+      // Render Tabel Log Aktivitas Presensi Hari Ini
+      renderTodayLogs(data.todayLogs || []);
     }
     
     function renderList(elementId, arr) {
@@ -489,8 +622,6 @@
       
       let html = '';
       arr.forEach((item, index) => {
-        let pointClass = item.poin > 0 ? 'plus' : (item.poin < 0 ? 'minus' : '');
-        let sign = item.poin > 0 ? '+' : '';
         let medal = '';
         if (index === 0) medal = '🥇 ';
         if (index === 1) medal = '🥈 ';
@@ -500,11 +631,57 @@
           <div class="list-item">
             <div class="rank">${index + 1}.</div>
             <div class="name-block">${medal}${item.nama}</div>
-            <div class="points ${pointClass}">${sign}${item.poin} pts</div>
+            <div class="points plus">+${item.poin} pts</div>
           </div>
         `;
       });
       el.innerHTML = html;
+    }
+
+    function renderTodayLogs(logs) {
+      const tbody = document.getElementById('logTableBody');
+      if (!logs || logs.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="7" style="text-align: center; color: var(--muted); padding: 25px;">
+              Belum ada aktivitas presensi hari ini.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      let rowsHtml = '';
+      logs.forEach(log => {
+        const isPulang = String(log.tipe).toLowerCase() === 'pulang';
+        const badgeTipeClass = isPulang ? 'badge-pulang' : 'badge-masuk';
+        const iconTipe = isPulang ? 'ph-sign-out' : 'ph-sign-in';
+
+        rowsHtml += `
+          <tr>
+            <td style="font-weight: 600;">${log.waktu || '-'}</td>
+            <td style="font-weight: 600; color: var(--pink-dark);">${log.nama}</td>
+            <td>${log.posisi || '-'}</td>
+            <td><span class="badge badge-shift">${log.shift}</span></td>
+            <td><span class="badge ${badgeTipeClass}"><i class="ph-bold ${iconTipe}"></i> ${log.tipe}</span></td>
+            <td>${log.status}</td>
+            <td>${log.jarak ? log.jarak + ' m' : '-'}</td>
+          </tr>
+        `;
+      });
+      tbody.innerHTML = rowsHtml;
+    }
+
+    function filterLogTable() {
+      const query = document.getElementById('searchInput').value.toLowerCase();
+      const rows = document.querySelectorAll('#logTableBody tr');
+      rows.forEach(row => {
+        const nameCell = row.children[1];
+        if (nameCell) {
+          const text = nameCell.textContent.toLowerCase();
+          row.style.display = text.includes(query) ? '' : 'none';
+        }
+      });
     }
     
     function switchTab(tabId, event) {
@@ -513,6 +690,39 @@
       
       document.querySelectorAll('.dashboard-section').forEach(sec => sec.classList.remove('active'));
       document.getElementById('sec-' + tabId).classList.add('active');
+    }
+
+    // Ekspor Data Presensi Hari Ini / Keseluruhan ke Format CSV
+    function exportDataCSV() {
+      if (!kpiData || !kpiData.todayLogs || kpiData.todayLogs.length === 0) {
+        alert("Belum ada data presensi yang dapat diekspor.");
+        return;
+      }
+
+      const headers = ["Waktu", "Tanggal", "Nama Karyawan", "ID Karyawan", "Posisi", "Shift", "Tipe Presensi", "Status", "Jarak (meter)"];
+      const rows = kpiData.todayLogs.map(log => [
+        `"${log.waktu || ''}"`,
+        `"${log.tanggal || ''}"`,
+        `"${log.nama || ''}"`,
+        `"${log.id || ''}"`,
+        `"${log.posisi || ''}"`,
+        `"${log.shift || ''}"`,
+        `"${log.tipe || ''}"`,
+        `"${log.status || ''}"`,
+        `"${log.jarak || 0}"`
+      ]);
+
+      let csvContent = "\uFEFF" + headers.join(",") + "\n" + rows.map(r => r.join(",")).join("\n");
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      
+      const link = document.createElement("a");
+      const today = new Date().toISOString().slice(0, 10);
+      link.setAttribute("href", url);
+      link.setAttribute("download", `Rekap_Presensi_Packing_Lozy_${today}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     }
     
     window.onload = loadData;

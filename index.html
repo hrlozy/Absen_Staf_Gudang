@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Presensi LOZY PCP Service</title>
+  <title>Presensi PCP Service - LOZY</title>
   <script src="https://unpkg.com/@phosphor-icons/web"></script>
   <script src="https://unpkg.com/html5-qrcode"></script>
   
@@ -20,6 +20,8 @@
       --muted: #766770;
       --line: #f0dfe2;
       --white: #ffffff;
+      --success: #10b981;
+      --success-soft: #ecfdf5;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -125,6 +127,70 @@
       box-shadow: 0 0 0 3px var(--pink-soft);
     }
 
+    /* Selector Tipe Presensi (Masuk / Pulang) */
+    .type-selector {
+      margin-bottom: 18px;
+      text-align: left;
+    }
+
+    .type-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .type-option {
+      position: relative;
+      cursor: pointer;
+    }
+
+    .type-option input[type="radio"] {
+      position: absolute;
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .type-card {
+      background: white;
+      border: 1.5px solid var(--line);
+      border-radius: 14px;
+      padding: 11px 12px;
+      text-align: center;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--muted);
+    }
+
+    .type-card i {
+      font-size: 18px;
+    }
+
+    .type-option:hover .type-card {
+      border-color: var(--pink);
+      background: var(--pink-soft);
+      color: var(--pink-dark);
+    }
+
+    .type-option input[type="radio"]:checked + .type-card {
+      border-color: var(--pink);
+      background: var(--pink-soft);
+      color: var(--pink-dark);
+      box-shadow: 0 4px 14px rgba(235, 127, 151, 0.2);
+    }
+
+    .type-option input[value="Pulang"]:checked + .type-card {
+      border-color: #f7b08d;
+      background: #fff8f5;
+      color: #c45a27;
+      box-shadow: 0 4px 14px rgba(247, 176, 141, 0.25);
+    }
+
     /* Shift Selector */
     .shift-selector {
       margin-bottom: 22px;
@@ -206,6 +272,15 @@
     .btn-primary:hover:not(:disabled) { 
       transform: translateY(-2px); 
       background: var(--pink-dark);
+    }
+
+    .btn-pulang {
+      background: #f7b08d !important;
+      color: #4b3040 !important;
+      box-shadow: 0 8px 24px rgba(247, 176, 141, 0.35) !important;
+    }
+    .btn-pulang:hover:not(:disabled) {
+      background: #eb9e78 !important;
     }
 
     .btn-secondary {
@@ -408,7 +483,7 @@
   <div class="card">
     <div class="eyebrow">PCP Service</div>
     <h2>Presensi Packing</h2>
-    <p class="subtitle">Ketik nama Anda, pilih shift kerja hari ini, lalu scan barcode validasi dengan kamera live.</p>
+    <p class="subtitle">Pilih nama, tipe presensi, dan shift kerja, lalu pindai barcode validasi dengan kamera live.</p>
 
     <!-- 1. Input Nama Karyawan dengan Autocomplete -->
     <label class="input-label" for="idInput">Nama Karyawan:</label>
@@ -418,7 +493,28 @@
       <datalist id="karyawanList"></datalist>
     </div>
 
-    <!-- 2. Wajib Pilih Shift -->
+    <!-- 2. Tipe Presensi (Masuk vs Pulang) -->
+    <div class="type-selector">
+      <label class="input-label">Tipe Presensi:</label>
+      <div class="type-grid">
+        <label class="type-option">
+          <input type="radio" name="tipeRadio" value="Masuk" checked onchange="updateScanButtonUI()">
+          <div class="type-card">
+            <i class="ph-bold ph-sign-in"></i>
+            <span>Masuk (Check-In)</span>
+          </div>
+        </label>
+        <label class="type-option">
+          <input type="radio" name="tipeRadio" value="Pulang" onchange="updateScanButtonUI()">
+          <div class="type-card">
+            <i class="ph-bold ph-sign-out"></i>
+            <span>Pulang (Check-Out)</span>
+          </div>
+        </label>
+      </div>
+    </div>
+
+    <!-- 3. Wajib Pilih Shift -->
     <div class="shift-selector">
       <label class="input-label">Pilih Shift Kerja (Wajib):</label>
       <div class="shift-grid">
@@ -445,9 +541,9 @@
       </div>
     </div>
 
-    <!-- 3. Tombol Utama Scan Barcode -->
+    <!-- 4. Tombol Utama Scan Barcode -->
     <button id="btnScan" class="btn btn-primary" onclick="bukaLiveScanner()">
-      <i class="ph-bold ph-camera"></i> Scan Barcode (Live Camera)
+      <i class="ph-bold ph-camera"></i> Scan Barcode Masuk (Check-In)
     </button>
 
     <!-- Fallback Foto Manual jika kamera bermasalah di perangkat lama -->
@@ -471,7 +567,7 @@
   <div id="scannerModal" class="custom-modal" style="display: none;">
     <div class="modal-box">
       <div class="modal-header">
-        <span class="modal-title">
+        <span class="modal-title" id="modalTitle">
           <i class="ph-bold ph-scan" style="color: var(--pink)"></i> Arahkan ke Barcode
         </span>
         <button class="modal-close-btn" onclick="tutupLiveScanner()">
@@ -497,9 +593,29 @@
   <script>
     // =========================================================================
     // KONFIGURASI URL BACKEND GOOGLE APPS SCRIPT
-    // Tempelkan URL Web App Deployment Anda di bawah ini (akhiran /exec):
     // =========================================================================
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyOzdmQ7CjwBqlIAAi23pX6poNpKDyIaUH6eE4yyPmUCXS5otqSuY01b3wYY-dr7eanLg/exec";
+
+    // Update UI tombol scan berdasarkan tipe presensi terpilih
+    function updateScanButtonUI() {
+      const tipe = getSelectedTipe();
+      const btn = document.getElementById('btnScan');
+      const modalTitle = document.getElementById('modalTitle');
+
+      if (tipe === 'Pulang') {
+        btn.innerHTML = '<i class="ph-bold ph-sign-out"></i> Scan Barcode Pulang (Check-Out)';
+        btn.classList.add('btn-pulang');
+        if (modalTitle) {
+          modalTitle.innerHTML = '<i class="ph-bold ph-sign-out" style="color: #c45a27"></i> Scan Barcode Pulang';
+        }
+      } else {
+        btn.innerHTML = '<i class="ph-bold ph-camera"></i> Scan Barcode Masuk (Check-In)';
+        btn.classList.remove('btn-pulang');
+        if (modalTitle) {
+          modalTitle.innerHTML = '<i class="ph-bold ph-scan" style="color: var(--pink)"></i> Scan Barcode Masuk';
+        }
+      }
+    }
 
     // Live Clock
     function updateClock() {
@@ -531,7 +647,6 @@
 
     // Ambil daftar nama karyawan dari database Master untuk autocomplete
     function muatDaftarKaryawan() {
-      // 1. Jika dijalankan di GitHub Pages (pakai fetch)
       if (SCRIPT_URL && !SCRIPT_URL.includes("EXAMPLE")) {
         fetch(SCRIPT_URL + "?action=getKaryawan")
           .then(res => res.json())
@@ -540,7 +655,6 @@
         return;
       }
 
-      // 2. Jika dijalankan langsung di dalam Google Apps Script (fallback)
       if (window.google && google.script && google.script.run) {
         google.script.run
           .withSuccessHandler(pasangDatalist)
@@ -556,12 +670,20 @@
         }
       }
     }
-    window.addEventListener('DOMContentLoaded', muatDaftarKaryawan);
+    window.addEventListener('DOMContentLoaded', function() {
+      muatDaftarKaryawan();
+      updateScanButtonUI();
+    });
 
-    // Helper mengambil nilai shift yang dipilih
+    // Helper mengambil nilai shift & tipe yang dipilih
     function getSelectedShift() {
       const selected = document.querySelector('input[name="shiftRadio"]:checked');
       return selected ? selected.value : '';
+    }
+
+    function getSelectedTipe() {
+      const selected = document.querySelector('input[name="tipeRadio"]:checked');
+      return selected ? selected.value : 'Masuk';
     }
 
     // Geolocation Setup
@@ -623,8 +745,6 @@
 
     // ==========================================================
     // LOGIKA LIVE CAMERA SCANNER
-    // Di GitHub Pages (domain top-level HTTPS), kamera live
-    // berjalan 100% lancar tanpa hambatan sandbox iframe Google!
     // ==========================================================
     let html5QrScannerInstance = null;
 
@@ -634,7 +754,6 @@
       const modal = document.getElementById('scannerModal');
       modal.style.display = 'flex';
 
-      // Beri jeda agar layout modal rendered sehingga viewport reader terhitung presisi
       setTimeout(function() {
         if (html5QrScannerInstance) {
           try { html5QrScannerInstance.clear(); } catch(e) {}
@@ -666,15 +785,13 @@
           kirimPresensi(decodedText);
         }
 
-        // Coba kamera belakang (environment) terlebih dahulu
         html5QrScannerInstance.start(
           { facingMode: "environment" },
           config,
           onScanSuccess,
           function() {}
         ).catch(function(errBack) {
-          console.warn("Kamera belakang tidak ditemukan, mencoba kamera default:", errBack);
-          // Fallback coba kamera user / webcam
+          console.warn("Kamera belakang tidak ditemukan, mencoba kamera user:", errBack);
           html5QrScannerInstance.start(
             { facingMode: "user" },
             config,
@@ -688,7 +805,7 @@
             output.className = 'alert error';
             alertIcon.className = 'ph-fill ph-warning-circle';
             output.style.display = 'flex';
-            alertMessage.innerText = 'Tidak dapat mengakses kamera: ' + (errFront.message || 'Izin kamera ditolak. Silakan izinkan akses kamera pada notifikasi browser.');
+            alertMessage.innerText = 'Tidak dapat mengakses kamera: ' + (errFront.message || 'Izin kamera ditolak. Silakan izinkan akses kamera di browser Anda.');
           });
         });
       }, 100);
@@ -761,7 +878,7 @@
                 document.getElementById('cameraInput').value = "";
                 output.className = 'alert error';
                 alertIcon.className = 'ph-fill ph-warning-circle';
-                alertMessage.innerText = 'Barcode tidak terdeteksi pada foto. Silakan coba kembali dengan posisi lebih dekat.';
+                alertMessage.innerText = 'Barcode tidak terdeteksi pada foto. Silakan coba kembali dengan pencahayaan cukup.';
               });
           }, 'image/jpeg', 0.88);
         };
@@ -772,12 +889,12 @@
 
     // ==========================================================
     // PENGIRIMAN DATA PRESENSI
-    // Bekerja fleksibel via fetch() di GitHub Pages atau google.script.run di Apps Script
     // ==========================================================
     function kirimPresensi(barcode) {
       const idInput = document.getElementById('idInput');
       const id = idInput.value.trim();
       const shift = getSelectedShift();
+      const tipe = getSelectedTipe();
       
       const output = document.getElementById('output');
       const alertMessage = document.getElementById('alertMessage');
@@ -811,18 +928,19 @@
       output.style.display = 'flex';
       output.className = 'alert warning';
       alertIcon.className = 'ph-bold ph-spinner ph-spin';
-      alertMessage.innerText = 'Sedang memproses presensi ke ' + shift + '...';
+      alertMessage.innerText = 'Sedang memproses presensi ' + tipe + ' ke ' + shift + '...';
 
       const payload = {
         action: 'presensi',
         nama: id,
         shift: shift,
+        tipe: tipe,
         barcode: barcode,
         lat: userLat,
         lng: userLng
       };
 
-      // 1. JIKA RUN DI GITHUB PAGES (Menggunakan fetch HTTP POST)
+      // 1. Eksekusi HTTP POST jika di hosting eksternal (GitHub Pages)
       if (SCRIPT_URL && !SCRIPT_URL.includes("EXAMPLE")) {
         fetch(SCRIPT_URL, {
           method: 'POST',
@@ -839,7 +957,7 @@
         return;
       }
 
-      // 2. JIKA RUN DI DALAM GOOGLE APPS SCRIPT
+      // 2. Eksekusi google.script.run jika di dalam Google Apps Script
       if (window.google && google.script && google.script.run) {
         google.script.run
           .withSuccessHandler(tanganiHasilPresensi)
@@ -849,12 +967,12 @@
             alertIcon.className = 'ph-fill ph-x-circle';
             alertMessage.innerText = 'Gagal terhubung ke server: ' + error.message;
           })
-          .prosesPresensi(id, shift, barcode, userLat, userLng);
+          .prosesPresensi(id, shift, barcode, userLat, userLng, tipe);
       } else {
         output.style.display = 'flex';
         output.className = 'alert error';
         alertIcon.className = 'ph-fill ph-warning-circle';
-        alertMessage.innerText = 'Konfigurasi Belum Selesai: Harap isi variabel SCRIPT_URL dengan link Deployment Web App Google Apps Script Anda pada file index.html.';
+        alertMessage.innerText = 'Konfigurasi Belum Selesai: Masukkan link Deployment Web App ke variabel SCRIPT_URL.';
       }
     }
 
@@ -875,6 +993,11 @@
         const radios = document.querySelectorAll('input[name="shiftRadio"]');
         radios.forEach(r => r.checked = false);
         
+        // Reset tipe kembali ke 'Masuk'
+        const masukRadio = document.querySelector('input[name="tipeRadio"][value="Masuk"]');
+        if (masukRadio) masukRadio.checked = true;
+        updateScanButtonUI();
+
         idInput.focus();
       } else if (res.status === 'warning') {
         alertIcon.className = 'ph-fill ph-warning';

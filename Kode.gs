@@ -1,11 +1,20 @@
+/**
+ * ============================================================================
+ * SISTEM PRESENSI & DASHBOARD KPI STAF PACKING (LOZY PCP SERVICE)
+ * Backend Google Apps Script
+ * ============================================================================
+ */
+
 function doGet(e) {
-  // 1. Endpoint JSON API untuk Frontend GitHub Pages (Metode GET)
+  // 1. Endpoint JSON API untuk Frontend GitHub Pages / Web Eksternal (Metode GET)
   if (e && e.parameter && e.parameter.action) {
     let output = {};
     if (e.parameter.action === 'getKaryawan') {
       output = getDaftarKaryawan();
     } else if (e.parameter.action === 'getKPIData') {
       output = getKPIData();
+    } else if (e.parameter.action === 'getExportData') {
+      output = getExportData();
     }
     return ContentService.createTextOutput(JSON.stringify(output))
       .setMimeType(ContentService.MimeType.JSON);
@@ -40,7 +49,7 @@ function doGet(e) {
 }
 
 /**
- * Endpoint JSON API untuk Menerima Data Presensi dari GitHub Pages (Metode POST)
+ * Endpoint JSON API untuk Menerima Data Presensi dari GitHub Pages / Web App (Metode POST)
  */
 function doPost(e) {
   try {
@@ -49,7 +58,6 @@ function doPost(e) {
       try {
         payload = JSON.parse(e.postData.contents);
       } catch(errJson) {
-        // Fallback jika dikirim via URL-encoded form
         payload = e.parameter || {};
       }
     } else if (e && e.parameter) {
@@ -58,11 +66,12 @@ function doPost(e) {
 
     const nama = payload.nama || payload.inputNamaKaryawan || '';
     const shift = payload.shift || payload.inputShift || '';
+    const tipe = payload.tipe || payload.tipePresensi || 'Masuk'; // 'Masuk' atau 'Pulang'
     const barcode = payload.barcode || payload.barcodeValidasi || '';
     const lat = parseFloat(payload.lat || payload.userLat || 0);
     const lng = parseFloat(payload.lng || payload.userLng || 0);
 
-    const result = prosesPresensi(nama, shift, barcode, lat, lng);
+    const result = prosesPresensi(nama, shift, barcode, lat, lng, tipe);
     
     return ContentService.createTextOutput(JSON.stringify(result))
       .setMimeType(ContentService.MimeType.JSON);
@@ -75,20 +84,22 @@ function doPost(e) {
   }
 }
 
-
-// JALANKAN FUNGSI INI SEKALI SAJA UNTUK MENG-GENERATE HEADER SPREADSHEET
+/**
+ * Inisialisasi & Setup Struktur Database Spreadsheet
+ * Jalankan fungsi ini sekali saat awal pemasangan sistem atau update header
+ */
 function setupDatabase() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   
   // 1. Setup Sheet Shift 1, Shift 2, Shift 3
   const shifts = ['Shift 1', 'Shift 2', 'Shift 3'];
+  const headers = ['Timestamp', 'Tanggal', 'Waktu', 'ID Karyawan', 'Nama', 'Posisi', 'Tipe Presensi', 'Status', 'Jarak (m)'];
+  
   shifts.forEach(shiftName => {
     let sheet = ss.getSheetByName(shiftName);
     if (!sheet) {
       sheet = ss.insertSheet(shiftName);
     }
-    // Paksa update header ke versi terbaru (Menambahkan Posisi)
-    const headers = ['Timestamp', 'Tanggal', 'Waktu', 'ID Karyawan', 'Nama', 'Posisi', 'Tipe Presensi', 'Waktu Masuk', 'Jarak (m)'];
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
     sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold').setBackground('#eb7f97').setFontColor('white');
     sheet.setFrozenRows(1);
@@ -101,7 +112,6 @@ function setupDatabase() {
     sheetMaster.appendRow(['ID Karyawan', 'Nama', 'Departemen', 'Posisi', 'Shift Assigned']);
     sheetMaster.appendRow(['LOZY001', 'Fulanah', 'People Ops', 'Staff Packing', 'Shift 1']);
   } else {
-    // Paksa update header ke versi terbaru (Menambahkan Posisi di antara Departemen dan Shift)
     sheetMaster.getRange('A1:E1').setValues([['ID Karyawan', 'Nama', 'Departemen', 'Posisi', 'Shift Assigned']]);
   }
   sheetMaster.getRange('A1:E1').setFontWeight('bold').setBackground('#4b3040').setFontColor('white');
@@ -113,27 +123,27 @@ function setupDatabase() {
     sheetPengaturan = ss.insertSheet('Pengaturan');
     sheetPengaturan.appendRow(['Kunci', 'Nilai', 'Keterangan']);
     sheetPengaturan.getRange('A1:C1').setFontWeight('bold').setBackground('#766770').setFontColor('white');
-    sheetPengaturan.appendRow(['Barcode_Valid', 'LOZY123', 'Satu barcode ini untuk semua shift']);
-    sheetPengaturan.appendRow(['Target_Lat', '-6.9174639', 'Garis lintang lokasi absensi']);
-    sheetPengaturan.appendRow(['Target_Lng', '107.6191228', 'Garis bujur lokasi absensi']);
-    sheetPengaturan.appendRow(['Max_Radius', '200', 'Jarak maksimal dalam meter (Saran: 200-300 untuk indoor)']);
+    sheetPengaturan.appendRow(['Barcode_Valid', 'LOZY123', 'Kode barcode valid (pisahkan koma jika lebih dari satu)']);
+    sheetPengaturan.appendRow(['Target_Lat', '-6.9174639', 'Garis lintang lokasi absensi gudang']);
+    sheetPengaturan.appendRow(['Target_Lng', '107.6191228', 'Garis bujur lokasi absensi gudang']);
+    sheetPengaturan.appendRow(['Max_Radius', '200', 'Jarak maksimal dalam meter (0 = nonaktifkan geofence)']);
+    sheetPengaturan.appendRow(['Dynamic_Barcode', 'TRUE', 'TRUE = Mendukung Barcode Dinamis Harian (LOZY + TGL)']);
     sheetPengaturan.setFrozenRows(1);
-    sheetPengaturan.setColumnWidths(1, 3, 200);
+    sheetPengaturan.setColumnWidths(1, 3, 220);
   }
 }
 
-// Menghitung jarak (Haversine formula)
+// Menghitung jarak presisi dua titik koordinat (Haversine formula dalam meter)
 function getDistanceFromLatLonInM(lat1, lon1, lat2, lon2) {
   var R = 6371000; 
-  var dLat = (lat2-lat1) * (Math.PI/180);
-  var dLon = (lon2-lon1) * (Math.PI/180); 
-  var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-          Math.cos(lat1 * (Math.PI/180)) * Math.cos(lat2 * (Math.PI/180)) * 
-          Math.sin(dLon/2) * Math.sin(dLon/2); 
-  var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+  var dLat = (lat2 - lat1) * (Math.PI / 180);
+  var dLon = (lon2 - lon1) * (Math.PI / 180); 
+  var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+          Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * 
+          Math.sin(dLon / 2) * Math.sin(dLon / 2); 
+  var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)); 
   return Math.round(R * c);
 }
-
 
 /**
  * Mengambil daftar nama karyawan aktif dari Master_Karyawan untuk autocomplete di frontend
@@ -162,14 +172,14 @@ function getDaftarKaryawan() {
 }
 
 /**
- * Pemrosesan Presensi Masuk (Check-In) dengan Shift yang Dipilih oleh Karyawan
+ * Pemrosesan Presensi Masuk (Check-In) & Pulang (Check-Out)
  */
-function prosesPresensi(inputNamaKaryawan, inputShift, barcodeValidasi, userLat, userLng) {
+function prosesPresensi(inputNamaKaryawan, inputShift, barcodeValidasi, userLat, userLng, inputTipe) {
   // Cegah race condition saat banyak karyawan presensi bersamaan
   const lock = LockService.getScriptLock();
   const successLock = lock.tryLock(15000); // Tunggu antrean hingga 15 detik
   if (!successLock) {
-    return { status: 'error', pesan: 'Sistem sedang sibuk memproses presensi lain. Silakan coba kembali sesaat lagi.' };
+    return { status: 'error', pesan: 'Sistem sedang sibuk memproses antrean presensi. Silakan scan kembali beberapa detik lagi.' };
   }
 
   try {
@@ -178,30 +188,58 @@ function prosesPresensi(inputNamaKaryawan, inputShift, barcodeValidasi, userLat,
     const sheetPengaturan = ss.getSheetByName('Pengaturan');
     
     if (!sheetMaster || !sheetPengaturan) {
-       return { status: 'error', pesan: 'Sistem belum di-setup. Jalankan setupDatabase() terlebih dahulu.' };
+       return { status: 'error', pesan: 'Sistem belum di-setup. Jalankan setupDatabase() terlebih dahulu di Google Apps Script.' };
     }
     
-    // 1. Validasi Pilihan Shift
-    const targetSheetName = String(inputShift || '').trim();
+    // 1. Validasi Pilihan Shift & Tipe Presensi
+    let targetSheetName = String(inputShift || '').trim();
     if (!['Shift 1', 'Shift 2', 'Shift 3'].includes(targetSheetName)) {
       return { status: 'error', pesan: 'Wajib memilih Shift (Shift 1, Shift 2, atau Shift 3) terlebih dahulu!' };
     }
+
+    let tipePresensi = String(inputTipe || 'Masuk').trim();
+    if (tipePresensi.toLowerCase() === 'pulang') {
+      tipePresensi = 'Pulang';
+    } else {
+      tipePresensi = 'Masuk';
+    }
     
-    // 2. Cek Pengaturan (Barcode & Lokasi Geofencing)
+    // 2. Baca Pengaturan (Barcode & Geofencing)
     const dataPengaturan = sheetPengaturan.getDataRange().getValues();
-    let validBarcode = '', targetLat = 0, targetLng = 0, maxRadius = 200;
+    let validBarcodes = ['LOZY123'];
+    let targetLat = 0, targetLng = 0, maxRadius = 200, dynamicBarcodeActive = true;
+
     for (let i = 1; i < dataPengaturan.length; i++) {
       let key = String(dataPengaturan[i][0]).trim();
       let val = dataPengaturan[i][1];
-      if (key === 'Barcode_Valid') validBarcode = String(val).trim();
+      if (key === 'Barcode_Valid') {
+        validBarcodes = String(val).split(',').map(b => b.trim().toUpperCase()).filter(Boolean);
+      }
       if (key === 'Target_Lat') targetLat = parseFloat(String(val).replace(',', '.'));
       if (key === 'Target_Lng') targetLng = parseFloat(String(val).replace(',', '.'));
       if (key === 'Max_Radius') maxRadius = parseFloat(String(val).replace(',', '.'));
+      if (key === 'Dynamic_Barcode') dynamicBarcodeActive = (String(val).trim().toUpperCase() === 'TRUE');
     }
     
-    // Validasi Barcode
-    if (String(barcodeValidasi).trim() !== validBarcode) {
-      return { status: 'error', pesan: 'Barcode Validasi tidak cocok atau salah!' };
+    // Validasi Barcode (Mendukung Multi-Barcode & Barcode Dinamis Harian)
+    const inputBarcodeClean = String(barcodeValidasi || '').trim().toUpperCase();
+    const now = new Date();
+    const tanggal = Utilities.formatDate(now, 'Asia/Jakarta', 'yyyy-MM-dd');
+    const waktu = Utilities.formatDate(now, 'Asia/Jakarta', 'HH:mm:ss');
+    const tglDinamisFormat1 = Utilities.formatDate(now, 'Asia/Jakarta', 'ddMMyyyy'); // Contoh: LOZY03112026
+    const tglDinamisFormat2 = Utilities.formatDate(now, 'Asia/Jakarta', 'yyyyMMdd');
+
+    let isBarcodeMatch = validBarcodes.includes(inputBarcodeClean);
+    if (!isBarcodeMatch && dynamicBarcodeActive) {
+      if (inputBarcodeClean === ('LOZY' + tglDinamisFormat1) || 
+          inputBarcodeClean === ('LOZY' + tglDinamisFormat2) ||
+          inputBarcodeClean === ('LOZYPACKING' + tglDinamisFormat1)) {
+        isBarcodeMatch = true;
+      }
+    }
+
+    if (!isBarcodeMatch) {
+      return { status: 'error', pesan: 'Barcode tidak cocok atau barcode fisik sudah diperbarui!' };
     }
     
     // Validasi Lokasi GPS & Geofencing
@@ -210,20 +248,19 @@ function prosesPresensi(inputNamaKaryawan, inputShift, barcodeValidasi, userLat,
       distance = getDistanceFromLatLonInM(userLat, userLng, targetLat, targetLng);
     }
     
-    // Geofencing aktif jika koordinat target dan maxRadius > 0
     if (maxRadius > 0 && targetLat !== 0 && targetLng !== 0) {
       if (!userLat || !userLng) {
-        return { status: 'error', pesan: 'Akses lokasi tidak ditemukan. Pastikan GPS aktif dan diizinkan pada perangkat Anda.' };
+        return { status: 'error', pesan: 'Akses GPS lokasi tidak terdeteksi. Pastikan GPS aktif dan diizinkan pada browser Anda.' };
       }
       if (distance > maxRadius) {
-        return { status: 'error', pesan: `Lokasi Anda di luar jangkauan! Jarak Anda ${distance} meter (Maksimal radius: ${maxRadius}m).` };
+        return { status: 'error', pesan: `Lokasi Anda di luar jangkauan gudang! Jarak Anda ${distance} meter (Batas radius: ${maxRadius}m).` };
       }
     }
     
-    // 3. Validasi Karyawan & Ambil Posisi dari Master_Karyawan
+    // 3. Validasi Karyawan & Ambil Data Posisi dari Master_Karyawan
     const lastRowMaster = sheetMaster.getLastRow();
     if (lastRowMaster <= 1) {
-      return { status: 'error', pesan: 'Data Master Karyawan masih kosong di spreadsheet.' };
+      return { status: 'error', pesan: 'Data Master Karyawan masih kosong di database spreadsheet.' };
     }
     
     const dataMaster = sheetMaster.getRange(1, 1, lastRowMaster, Math.max(5, sheetMaster.getLastColumn())).getValues();
@@ -247,46 +284,40 @@ function prosesPresensi(inputNamaKaryawan, inputShift, barcodeValidasi, userLat,
     }
     
     if (!namaKaryawan) {
-      return { status: 'error', pesan: 'Nama karyawan tidak ditemukan di Master Karyawan. Pastikan nama sesuai dengan yang terdaftar.' };
+      return { status: 'error', pesan: 'Nama karyawan tidak ditemukan di Master Karyawan. Pastikan memilih nama yang terdaftar.' };
     }
     
     // 4. Pastikan Sheet Shift Tujuan Ada
     let sheetTarget = ss.getSheetByName(targetSheetName);
     if (!sheetTarget) {
       sheetTarget = ss.insertSheet(targetSheetName);
-      const headers = ['Timestamp', 'Tanggal', 'Waktu', 'ID Karyawan', 'Nama', 'Posisi', 'Tipe Presensi', 'Waktu Masuk', 'Jarak (m)'];
+      const headers = ['Timestamp', 'Tanggal', 'Waktu', 'ID Karyawan', 'Nama', 'Posisi', 'Tipe Presensi', 'Status', 'Jarak (m)'];
       sheetTarget.appendRow(headers);
       sheetTarget.getRange(1, 1, 1, headers.length).setFontWeight('bold').setBackground('#eb7f97').setFontColor('white');
       sheetTarget.setFrozenRows(1);
     }
     
-    const now = new Date();
-    const tanggal = Utilities.formatDate(now, 'Asia/Jakarta', 'yyyy-MM-dd');
-    const waktu = Utilities.formatDate(now, 'Asia/Jakarta', 'HH:mm:ss');
-    
-    // 5. Cek Duplikasi / Anti Spam pada Sheet Shift Tersebut
+    // 5. Verifikasi Anti-Spam & Status Presensi Hari Ini
     const lastRowTarget = sheetTarget.getLastRow();
+    let sudahMasukHariIni = false;
+    let waktuMasukHariIni = '';
+    let sudahPulangHariIni = false;
+    let waktuPulangHariIni = '';
+    let lastScanTime = 0;
+
     if (lastRowTarget > 1) {
-      let startRow = Math.max(2, lastRowTarget - 100);
-      let numRows = lastRowTarget - startRow + 1;
-      let data = sheetTarget.getRange(startRow, 1, numRows, 9).getValues();
-      
-      for (let j = data.length - 1; j >= 0; j--) {
-        // Kolom index 3 adalah ID Karyawan (D)
-        if (String(data[j][3]).trim().toUpperCase() === String(idKaryawanAsli).trim().toUpperCase()) {
-          let rowTimestamp = new Date(data[j][0]).getTime();
-          let diffMinutes = (now.getTime() - rowTimestamp) / 60000;
-          
-          // Cegah double klik / scan bertubi-tubi dalam 5 menit
-          if (diffMinutes < 5) {
-            return { 
-              status: 'warning', 
-              pesan: `Halo ${namaKaryawan}, kamu baru saja melakukan presensi di ${targetSheetName}.` 
-            };
+      const dataRiwayat = sheetTarget.getRange(2, 1, lastRowTarget - 1, 8).getValues();
+      const idUpper = String(idKaryawanAsli).trim().toUpperCase();
+
+      for (let j = dataRiwayat.length - 1; j >= 0; j--) {
+        const rowId = String(dataRiwayat[j][3]).trim().toUpperCase();
+        if (rowId === idUpper) {
+          const rowTimestamp = new Date(dataRiwayat[j][0]).getTime();
+          if (rowTimestamp > lastScanTime) {
+            lastScanTime = rowTimestamp;
           }
-          
-          // Cek tanggal presensi sebelumnya pada shift ini
-          let rowDateRaw = data[j][1];
+
+          let rowDateRaw = dataRiwayat[j][1];
           let rowDateStr = String(rowDateRaw || '').trim();
           let isSameDay = (rowDateStr === tanggal);
           if (!isSameDay) {
@@ -295,28 +326,124 @@ function prosesPresensi(inputNamaKaryawan, inputShift, barcodeValidasi, userLat,
               if (parsed === tanggal) isSameDay = true;
             } catch(e) {}
           }
-          
+
           if (isSameDay) {
-            let prevWaktu = data[j][2] || '';
-            return { 
-              status: 'warning', 
-              pesan: `Halo ${namaKaryawan}, kamu sudah tercatat presensi di ${targetSheetName} hari ini (pukul ${prevWaktu}).` 
-            };
+            const rowTipe = String(dataRiwayat[j][6] || 'Masuk').trim().toLowerCase();
+            const rowWaktu = String(dataRiwayat[j][2] || '').trim();
+
+            if (rowTipe === 'masuk') {
+              sudahMasukHariIni = true;
+              if (!waktuMasukHariIni) waktuMasukHariIni = rowWaktu;
+            } else if (rowTipe === 'pulang') {
+              sudahPulangHariIni = true;
+              if (!waktuPulangHariIni) waktuPulangHariIni = rowWaktu;
+            }
           }
-          break;
         }
       }
     }
+
+    // Auto-Detection Shift untuk Presensi Pulang:
+    // Jika karyawan presensi Pulang tetapi di shift yang dipilih belum pernah Masuk,
+    // periksa apakah tadi pagi dia Masuk di shift lain, lalu otomatis arahkan ke shift tersebut.
+    if (tipePresensi === 'Pulang' && !sudahMasukHariIni) {
+      const otherShifts = ['Shift 1', 'Shift 2', 'Shift 3'].filter(s => s !== targetSheetName);
+      for (let s = 0; s < otherShifts.length; s++) {
+        let altSheet = ss.getSheetByName(otherShifts[s]);
+        if (!altSheet) continue;
+        let altLastRow = altSheet.getLastRow();
+        if (altLastRow <= 1) continue;
+
+        let altData = altSheet.getRange(2, 1, altLastRow - 1, 8).getValues();
+        for (let k = altData.length - 1; k >= 0; k--) {
+          if (String(altData[k][3]).trim().toUpperCase() === String(idKaryawanAsli).trim().toUpperCase()) {
+            let altDate = String(altData[k][1] || '').trim();
+            let isAltSameDay = (altDate === tanggal);
+            if (!isAltSameDay) {
+              try {
+                if (Utilities.formatDate(new Date(altData[k][1]), 'Asia/Jakarta', 'yyyy-MM-dd') === tanggal) {
+                  isAltSameDay = true;
+                }
+              } catch(e) {}
+            }
+
+            if (isAltSameDay && String(altData[k][6] || 'Masuk').trim().toLowerCase() === 'masuk') {
+              // Ditemukan shift kerja aslinya hari ini!
+              sheetTarget = altSheet;
+              targetSheetName = otherShifts[s];
+              sudahMasukHariIni = true;
+              waktuMasukHariIni = String(altData[k][2] || '').trim();
+              
+              // Cek juga apakah sudah pernah pulang di shift aslinya
+              for (let m = altData.length - 1; m >= 0; m--) {
+                if (String(altData[m][3]).trim().toUpperCase() === String(idKaryawanAsli).trim().toUpperCase()) {
+                  let mDate = String(altData[m][1] || '').trim();
+                  let isMSameDay = (mDate === tanggal);
+                  if (!isMSameDay) {
+                    try {
+                      if (Utilities.formatDate(new Date(altData[m][1]), 'Asia/Jakarta', 'yyyy-MM-dd') === tanggal) isMSameDay = true;
+                    } catch(e) {}
+                  }
+                  if (isMSameDay && String(altData[m][6] || '').trim().toLowerCase() === 'pulang') {
+                    sudahPulangHariIni = true;
+                    waktuPulangHariIni = String(altData[m][2] || '').trim();
+                    break;
+                  }
+                }
+              }
+              break;
+            }
+          }
+        }
+        if (sudahMasukHariIni) break;
+      }
+    }
+
+    // A. Cegah double-tap / spam klik berulang dalam kurun 3 menit
+    if (lastScanTime > 0) {
+      let diffMinutes = (now.getTime() - lastScanTime) / 60000;
+      if (diffMinutes < 3) {
+        return { 
+          status: 'warning', 
+          pesan: `Halo ${namaKaryawan}, kamu baru saja memindai presensi di ${targetSheetName}. Harap tunggu jeda sebentar.` 
+        };
+      }
+    }
+
+    // B. Logika Validasi Alur Masuk vs Pulang
+    if (tipePresensi === 'Masuk') {
+      if (sudahMasukHariIni) {
+        return { 
+          status: 'warning', 
+          pesan: `Halo ${namaKaryawan}, kamu sudah tercatat presensi Masuk di ${targetSheetName} hari ini (pukul ${waktuMasukHariIni}).` 
+        };
+      }
+    } else if (tipePresensi === 'Pulang') {
+      if (!sudahMasukHariIni) {
+        return { 
+          status: 'warning', 
+          pesan: `Halo ${namaKaryawan}, kamu belum melakukan presensi Masuk hari ini. Silakan pilih opsi Masuk terlebih dahulu!` 
+        };
+      }
+      if (sudahPulangHariIni) {
+        return { 
+          status: 'warning', 
+          pesan: `Halo ${namaKaryawan}, kamu sudah tercatat presensi Pulang hari ini (pukul ${waktuPulangHariIni}). Sampai jumpa besok!` 
+        };
+      }
+    }
     
-    // 6. Status Kehadiran Fleksibel (Tidak dipengaruhi oleh jam shift, jam berapapun presensi diakui Hadir)
-    const statusPresensi = 'Hadir';
+    // 6. Simpan Baris Presensi ke Sheet Shift Terpilih
+    const statusPresensi = (tipePresensi === 'Masuk') ? 'Hadir' : 'Selesai';
+    sheetTarget.appendRow([now, tanggal, waktu, idKaryawanAsli, namaKaryawan, posisiKaryawan, tipePresensi, statusPresensi, distance]);
     
-    // 7. Simpan Baris Presensi ke Sheet Shift Pilihan Karyawan
-    sheetTarget.appendRow([now, tanggal, waktu, idKaryawanAsli, namaKaryawan, posisiKaryawan, 'Masuk', statusPresensi, distance]);
-    
+    const pesanSukses = (tipePresensi === 'Masuk') 
+      ? `Presensi Masuk ${targetSheetName} berhasil disimpan! Semangat bekerja, ${namaKaryawan}.`
+      : `Presensi Pulang ${targetSheetName} berhasil disimpan! Terima kasih atas kerja kerasmu hari ini, ${namaKaryawan}. Hati-hati di jalan!`;
+
     return { 
       status: 'success', 
-      pesan: `Presensi ${targetSheetName} berhasil disimpan! Semangat bekerja, ${namaKaryawan}.` 
+      pesan: pesanSukses 
     };
     
   } catch (error) {
@@ -326,7 +453,9 @@ function prosesPresensi(inputNamaKaryawan, inputShift, barcodeValidasi, userLat,
   }
 }
 
-// FUNGSI UNTUK MENGAMBIL DATA KPI DASHBOARD (FOKUS KEHADIRAN & DISTRIBUSI SHIFT FLEKSIBEL)
+/**
+ * Mengambil Data KPI Dashboard (Statistik Kehadiran, Log Hari Ini, & Leaderboard)
+ */
 function getKPIData() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const shifts = ['Shift 1', 'Shift 2', 'Shift 3'];
@@ -348,6 +477,7 @@ function getKPIData() {
   let summary = {
     totalKaryawan: totalKaryawanAktif,
     hadirHariIni: 0,
+    pulangHariIni: 0,
     shift1HariIni: 0,
     shift2HariIni: 0,
     shift3HariIni: 0
@@ -355,6 +485,8 @@ function getKPIData() {
   
   let todayDateStr = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'yyyy-MM-dd');
   let hadirSet = new Set();
+  let pulangSet = new Set();
+  let todayLogs = [];
   
   let chartData = {
     shift1: 0,
@@ -367,21 +499,35 @@ function getKPIData() {
     if (!sheet) return;
     
     const data = sheet.getDataRange().getValues();
-    if (data.length <= 1) return; // cuma header
+    if (data.length <= 1) return; // Hanya baris header
     
     const headers = data[0];
-    let idxNama = headers.indexOf('Nama');
+    let idxTimestamp = headers.indexOf('Timestamp');
     let idxTanggal = headers.indexOf('Tanggal');
+    let idxWaktu = headers.indexOf('Waktu');
+    let idxID = headers.indexOf('ID Karyawan');
+    let idxNama = headers.indexOf('Nama');
+    let idxPosisi = headers.indexOf('Posisi');
+    let idxTipe = headers.indexOf('Tipe Presensi');
+    let idxStatus = headers.indexOf('Status');
+    let idxJarak = headers.indexOf('Jarak (m)');
     
-    // Fallback index jika format kolom bergeser
-    if (idxNama === -1) idxNama = 4;
+    if (idxTimestamp === -1) idxTimestamp = 0;
     if (idxTanggal === -1) idxTanggal = 1;
+    if (idxWaktu === -1) idxWaktu = 2;
+    if (idxID === -1) idxID = 3;
+    if (idxNama === -1) idxNama = 4;
+    if (idxPosisi === -1) idxPosisi = 5;
+    if (idxTipe === -1) idxTipe = 6;
+    if (idxStatus === -1) idxStatus = 7;
+    if (idxJarak === -1) idxJarak = 8;
     
     let currentShiftKey = 'shift' + (idx + 1);
     
     for (let i = 1; i < data.length; i++) {
-      let nama = String(data[i][idxNama]).trim();
+      let nama = String(data[i][idxNama] || '').trim();
       let tanggalRaw = data[i][idxTanggal];
+      let tipe = String(data[i][idxTipe] || 'Masuk').trim();
       
       if (!nama) continue;
       
@@ -396,38 +542,59 @@ function getKPIData() {
         } catch(e) {}
       }
       
-      // Akumulasi total kehadiran per shift untuk grafik distribusi
-      chartData[currentShiftKey] = (chartData[currentShiftKey] || 0) + 1;
-      
-      if (isToday) {
-        hadirSet.add(nama);
-        if (currentShiftKey === 'shift1') summary.shift1HariIni++;
-        if (currentShiftKey === 'shift2') summary.shift2HariIni++;
-        if (currentShiftKey === 'shift3') summary.shift3HariIni++;
+      // Akumulasi total kehadiran per shift untuk diagram
+      if (tipe.toLowerCase() === 'masuk') {
+        chartData[currentShiftKey] = (chartData[currentShiftKey] || 0) + 1;
+        
+        // Poin kehadiran (10 poin tiap presensi masuk)
+        let poin = 10;
+        kpiStore[currentShiftKey][nama] = (kpiStore[currentShiftKey][nama] || 0) + poin;
+        kpiStore.overall[nama] = (kpiStore.overall[nama] || 0) + poin;
       }
       
-      // Poin kehadiran fleksibel (10 poin tiap kehadiran)
-      let poin = 10;
-      kpiStore[currentShiftKey][nama] = (kpiStore[currentShiftKey][nama] || 0) + poin;
-      kpiStore.overall[nama] = (kpiStore.overall[nama] || 0) + poin;
+      if (isToday) {
+        if (tipe.toLowerCase() === 'pulang') {
+          pulangSet.add(nama);
+        } else {
+          hadirSet.add(nama);
+          if (currentShiftKey === 'shift1') summary.shift1HariIni++;
+          if (currentShiftKey === 'shift2') summary.shift2HariIni++;
+          if (currentShiftKey === 'shift3') summary.shift3HariIni++;
+        }
+
+        todayLogs.push({
+          timestamp: data[i][idxTimestamp],
+          tanggal: rawTglStr,
+          waktu: String(data[i][idxWaktu] || ''),
+          id: String(data[i][idxID] || ''),
+          nama: nama,
+          posisi: String(data[i][idxPosisi] || '-'),
+          shift: shiftName,
+          tipe: tipe,
+          status: String(data[i][idxStatus] || 'Hadir'),
+          jarak: data[i][idxJarak] || 0
+        });
+      }
     }
   });
   
   summary.hadirHariIni = hadirSet.size;
+  summary.pulangHariIni = pulangSet.size;
   
-  // Format dan sort data
+  todayLogs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
   function formatAndSort(obj) {
     let arr = [];
     for (let n in obj) {
       arr.push({ nama: n, poin: obj[n] });
     }
-    // Sort descending (poin / jumlah kehadiran tertinggi)
     return arr.sort((a, b) => b.poin - a.poin);
   }
   
   return {
     summary: summary,
     chartData: chartData,
+    todayLogs: todayLogs,
     leaderboard: {
       shift1: formatAndSort(kpiStore.shift1),
       shift2: formatAndSort(kpiStore.shift2),
@@ -435,4 +602,38 @@ function getKPIData() {
       overall: formatAndSort(kpiStore.overall)
     }
   };
+}
+
+/**
+ * Mengambil Seluruh Data Riwayat Presensi untuk Ekspor CSV/Excel
+ */
+function getExportData() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const shifts = ['Shift 1', 'Shift 2', 'Shift 3'];
+  let allRecords = [];
+
+  shifts.forEach(shiftName => {
+    const sheet = ss.getSheetByName(shiftName);
+    if (!sheet) return;
+    const data = sheet.getDataRange().getValues();
+    if (data.length <= 1) return;
+
+    for (let i = 1; i < data.length; i++) {
+      allRecords.push({
+        timestamp: data[i][0],
+        tanggal: data[i][1],
+        waktu: data[i][2],
+        id: data[i][3],
+        nama: data[i][4],
+        posisi: data[i][5],
+        shift: shiftName,
+        tipe: data[i][6],
+        status: data[i][7],
+        jarak: data[i][8]
+      });
+    }
+  });
+
+  allRecords.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  return allRecords;
 }
