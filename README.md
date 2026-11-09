@@ -17,9 +17,9 @@ Sistem Presensi & Dashboard KPI Staf Packing Gudang (LOZY PCP Service).
 - **Hosting**: Fleksibel berjalan murni di Google Apps Script Web App maupun di-hosting di GitHub Pages.
 
 ## Struktur Database `Master_Karyawan`
-| ID Karyawan | Nama | Departemen | Posisi | Shift Assigned | Password | Barcode Posisi |
+| ID Karyawan (A) | Nama (B) | Departemen (C) | Posisi (D) | Shift Assigned (E) | Barcode Posisi (F) | Password (G) |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| LOZY001 | Fulanah | People Ops | Staff Packing | Shift 1 | 123456 | Staff Packing |
+| LOZY001 | Fulanah | People Ops | Staff Packing | Shift 1 | Staff Packing | 123456 |
 
 ## Struktur File
 - [`index.html`](index.html): Halaman antarmuka presensi staf gudang (input nama, input password pribadi, selector tipe presensi & shift, live scanner posisi).

@@ -105,13 +105,13 @@ function setupDatabase() {
     sheet.setFrozenRows(1);
   });
   
-  // 2. Setup Sheet Master Karyawan (Lengkap dengan Password & Barcode Posisi)
+  // 2. Setup Sheet Master Karyawan (Password di Kolom G)
   let sheetMaster = ss.getSheetByName('Master_Karyawan');
-  const masterHeaders = ['ID Karyawan', 'Nama', 'Departemen', 'Posisi', 'Shift Assigned', 'Password', 'Barcode Posisi'];
+  const masterHeaders = ['ID Karyawan', 'Nama', 'Departemen', 'Posisi', 'Shift Assigned', 'Barcode Posisi', 'Password'];
   if (!sheetMaster) {
     sheetMaster = ss.insertSheet('Master_Karyawan');
     sheetMaster.appendRow(masterHeaders);
-    sheetMaster.appendRow(['LOZY001', 'Fulanah', 'People Ops', 'Staff Packing', 'Shift 1', '123456', 'Staff Packing']);
+    sheetMaster.appendRow(['LOZY001', 'Fulanah', 'People Ops', 'Staff Packing', 'Shift 1', 'Staff Packing', '123456']);
   } else {
     // Pastikan struktur header diperbarui
     sheetMaster.getRange(1, 1, 1, masterHeaders.length).setValues([masterHeaders]);
@@ -250,13 +250,24 @@ function prosesPresensi(inputNamaKaryawan, inputShift, barcodeValidasi, userLat,
       return { status: 'error', pesan: 'Data Master Karyawan masih kosong di database spreadsheet.' };
     }
     
-    const dataMaster = sheetMaster.getRange(1, 1, lastRowMaster, Math.max(7, sheetMaster.getLastColumn())).getValues();
+    // Baca data Master Karyawan hingga kolom H (minimal 8 kolom agar Kolom G selalu terambil)
+    const dataMaster = sheetMaster.getRange(1, 1, lastRowMaster, Math.max(8, sheetMaster.getLastColumn())).getValues();
     const headerMaster = dataMaster[0] || [];
     const idxID = headerMaster.indexOf('ID Karyawan') !== -1 ? headerMaster.indexOf('ID Karyawan') : 0;
     const idxNama = headerMaster.indexOf('Nama') !== -1 ? headerMaster.indexOf('Nama') : 1;
     const idxPosisi = headerMaster.indexOf('Posisi') !== -1 ? headerMaster.indexOf('Posisi') : 3;
-    const idxPassword = headerMaster.indexOf('Password');
-    const idxBarcodePosisi = headerMaster.indexOf('Barcode Posisi');
+
+    // Kolom G adalah index 6 (A=0, B=1, C=2, D=3, E=4, F=5, G=6)
+    let idxPassword = 6; 
+    for (let h = 0; h < headerMaster.length; h++) {
+      let hName = String(headerMaster[h] || '').trim().toLowerCase();
+      if (hName === 'password' || hName === 'pin' || hName === 'pass' || hName === 'kata sandi') {
+        idxPassword = h;
+        break;
+      }
+    }
+
+    let idxBarcodePosisi = headerMaster.indexOf('Barcode Posisi');
 
     let idKaryawanAsli = '';
     let namaKaryawan = '';
@@ -272,8 +283,11 @@ function prosesPresensi(inputNamaKaryawan, inputShift, barcodeValidasi, userLat,
         if (idxPosisi !== -1 && dataMaster[i][idxPosisi]) {
           posisiKaryawan = String(dataMaster[i][idxPosisi]).trim();
         }
-        if (idxPassword !== -1 && dataMaster[i][idxPassword] !== undefined && dataMaster[i][idxPassword] !== '') {
+        // Ambil password dari idxPassword atau langsung dari Kolom G (index 6)
+        if (idxPassword !== -1 && dataMaster[i][idxPassword] !== undefined && String(dataMaster[i][idxPassword]).trim() !== '') {
           passwordTerdaftar = String(dataMaster[i][idxPassword]).trim();
+        } else if (dataMaster[i][6] !== undefined && String(dataMaster[i][6]).trim() !== '') {
+          passwordTerdaftar = String(dataMaster[i][6]).trim();
         }
         if (idxBarcodePosisi !== -1 && dataMaster[i][idxBarcodePosisi]) {
           barcodePosisiKhusus = String(dataMaster[i][idxBarcodePosisi]).trim();
