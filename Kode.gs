@@ -184,6 +184,9 @@ function cekKesesuaianPosisi(inputBarcode, posisiKaryawan, barcodePosisiKhusus, 
   const pClean = String(posisiKaryawan || '').trim().toUpperCase();
   const bSpecialClean = String(barcodePosisiKhusus || '').trim().toUpperCase();
 
+  // 0. Jika posisi karyawan di Master belum diatur / masih '-'
+  if (!pClean || pClean === '-') return true;
+
   // 1. Jika ada Barcode Posisi spesifik di Master Karyawan
   if (bSpecialClean && bClean === bSpecialClean) return true;
 
@@ -306,10 +309,16 @@ function prosesPresensi(inputNamaKaryawan, inputShift, barcodeValidasi, userLat,
       return { status: 'error', pesan: 'Password wajib dimasukkan sebelum melakukan scan posisi!' };
     }
 
-    // Jika admin belum mengisi kolom password di sheet, gunakan ID Karyawan atau '123456' sebagai password default
-    const expectedPassword = passwordTerdaftar || idKaryawanAsli || '123456';
-    if (passwordInputClean !== expectedPassword && passwordInputClean !== idKaryawanAsli && passwordInputClean !== '123456') {
-      return { status: 'error', pesan: 'Password salah untuk karyawan ' + namaKaryawan + '! Silakan periksa kembali password Anda.' };
+    // Jika di Kolom G sudah terisi password, verifikasi secara ketat
+    if (passwordTerdaftar) {
+      if (passwordInputClean !== passwordTerdaftar) {
+        return { status: 'error', pesan: 'Password salah untuk karyawan ' + namaKaryawan + '! Silakan periksa kembali password Anda.' };
+      }
+    } else {
+      // Jika Kolom G di sheet masih kosong, gunakan ID Karyawan atau '123456' sebagai default
+      if (passwordInputClean !== idKaryawanAsli && passwordInputClean !== '123456') {
+        return { status: 'error', pesan: 'Password salah untuk karyawan ' + namaKaryawan + '! Gunakan ID Karyawan Anda atau hubungi admin.' };
+      }
     }
 
     // 4. Validasi Barcode Posisi (Memverifikasi kesesuaian posisi yang di-scan)
