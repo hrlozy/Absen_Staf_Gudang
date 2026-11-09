@@ -82,7 +82,7 @@
     p.subtitle {
       color: var(--muted);
       font-size: 13.5px;
-      margin-bottom: 22px;
+      margin-bottom: 20px;
       line-height: 1.4;
     }
 
@@ -92,26 +92,28 @@
       font-size: 13px;
       font-weight: 600;
       color: var(--text);
-      margin-bottom: 8px;
+      margin-bottom: 7px;
     }
 
     .input-group {
       position: relative;
-      margin-bottom: 18px;
+      margin-bottom: 16px;
     }
 
-    .input-group i {
+    .input-group i.input-icon {
       position: absolute;
       left: 16px;
       top: 50%;
       transform: translateY(-50%);
       color: var(--muted);
       font-size: 20px;
+      pointer-events: none;
     }
 
-    input[type="text"] {
+    input[type="text"],
+    input[type="password"] {
       width: 100%;
-      padding: 14px 15px 14px 48px;
+      padding: 13px 15px 13px 48px;
       border: 1px solid var(--line);
       border-radius: 14px;
       font-size: 15px;
@@ -121,15 +123,40 @@
       transition: all 0.2s;
     }
 
-    input[type="text"]:focus {
+    input[type="password"] {
+      padding-right: 48px;
+    }
+
+    input[type="text"]:focus,
+    input[type="password"]:focus {
       outline: none;
       border-color: var(--pink);
       box-shadow: 0 0 0 3px var(--pink-soft);
     }
 
+    .btn-toggle-pwd {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 20px;
+      padding: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: color 0.2s;
+    }
+    .btn-toggle-pwd:hover {
+      color: var(--pink-dark);
+    }
+
     /* Selector Tipe Presensi (Masuk / Pulang) */
     .type-selector {
-      margin-bottom: 18px;
+      margin-bottom: 16px;
       text-align: left;
     }
 
@@ -193,7 +220,7 @@
 
     /* Shift Selector */
     .shift-selector {
-      margin-bottom: 22px;
+      margin-bottom: 20px;
       text-align: left;
     }
 
@@ -219,7 +246,7 @@
       background: white;
       border: 1.5px solid var(--line);
       border-radius: 14px;
-      padding: 13px 8px;
+      padding: 12px 8px;
       text-align: center;
       transition: all 0.2s ease;
       display: flex;
@@ -228,7 +255,7 @@
     }
 
     .shift-card .title {
-      font-size: 14.5px;
+      font-size: 14px;
       font-weight: 700;
       color: var(--text);
     }
@@ -483,17 +510,27 @@
   <div class="card">
     <div class="eyebrow">PCP Service</div>
     <h2>Presensi Packing</h2>
-    <p class="subtitle">Pilih nama, tipe presensi, dan shift kerja, lalu pindai barcode validasi dengan kamera live.</p>
+    <p class="subtitle">Pilih nama, masukkan password Anda, lalu scan barcode posisi kerja Anda.</p>
 
     <!-- 1. Input Nama Karyawan dengan Autocomplete -->
     <label class="input-label" for="idInput">Nama Karyawan:</label>
     <div class="input-group">
-      <i class="ph-bold ph-user"></i>
+      <i class="ph-bold ph-user input-icon"></i>
       <input type="text" id="idInput" list="karyawanList" placeholder="Ketik / pilih Nama Anda" autocomplete="off" />
       <datalist id="karyawanList"></datalist>
     </div>
 
-    <!-- 2. Tipe Presensi (Masuk vs Pulang) -->
+    <!-- 2. Input Password / PIN Karyawan -->
+    <label class="input-label" for="passwordInput">Password / PIN Pribadi:</label>
+    <div class="input-group">
+      <i class="ph-bold ph-lock-key input-icon"></i>
+      <input type="password" id="passwordInput" placeholder="Masukkan password Anda" autocomplete="current-password" />
+      <button type="button" class="btn-toggle-pwd" onclick="togglePasswordVisibility()" title="Lihat/Sembunyikan Password">
+        <i id="pwdToggleIcon" class="ph-bold ph-eye"></i>
+      </button>
+    </div>
+
+    <!-- 3. Tipe Presensi (Masuk vs Pulang) -->
     <div class="type-selector">
       <label class="input-label">Tipe Presensi:</label>
       <div class="type-grid">
@@ -514,7 +551,7 @@
       </div>
     </div>
 
-    <!-- 3. Wajib Pilih Shift -->
+    <!-- 4. Wajib Pilih Shift -->
     <div class="shift-selector">
       <label class="input-label">Pilih Shift Kerja (Wajib):</label>
       <div class="shift-grid">
@@ -541,9 +578,9 @@
       </div>
     </div>
 
-    <!-- 4. Tombol Utama Scan Barcode -->
+    <!-- 5. Tombol Utama Scan Barcode Posisi -->
     <button id="btnScan" class="btn btn-primary" onclick="bukaLiveScanner()">
-      <i class="ph-bold ph-camera"></i> Scan Barcode Masuk (Check-In)
+      <i class="ph-bold ph-camera"></i> Scan Barcode Posisi (Masuk)
     </button>
 
     <!-- Fallback Foto Manual jika kamera bermasalah di perangkat lama -->
@@ -568,7 +605,7 @@
     <div class="modal-box">
       <div class="modal-header">
         <span class="modal-title" id="modalTitle">
-          <i class="ph-bold ph-scan" style="color: var(--pink)"></i> Arahkan ke Barcode
+          <i class="ph-bold ph-scan" style="color: var(--pink)"></i> Scan Barcode Posisi
         </span>
         <button class="modal-close-btn" onclick="tutupLiveScanner()">
           <i class="ph-bold ph-x"></i>
@@ -580,8 +617,8 @@
         <div class="scanner-laser"></div>
       </div>
       
-      <p class="scanner-tip">
-        Posisikan Barcode atau QR Code tepat di tengah area kamera. Scanner membaca otomatis secara real-time.
+      <p class="scanner-tip" id="scannerTip">
+        Arahkan kamera tepat ke Barcode Posisi kerja Anda. Sistem memverifikasi kesesuaian posisi secara otomatis.
       </p>
       
       <button class="btn btn-secondary" onclick="tutupLiveScanner()">
@@ -596,6 +633,19 @@
     // =========================================================================
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyOzdmQ7CjwBqlIAAi23pX6poNpKDyIaUH6eE4yyPmUCXS5otqSuY01b3wYY-dr7eanLg/exec";
 
+    // Toggle Tampilkan / Sembunyikan Password
+    function togglePasswordVisibility() {
+      const pwdInput = document.getElementById('passwordInput');
+      const icon = document.getElementById('pwdToggleIcon');
+      if (pwdInput.type === 'password') {
+        pwdInput.type = 'text';
+        icon.className = 'ph-bold ph-eye-slash';
+      } else {
+        pwdInput.type = 'password';
+        icon.className = 'ph-bold ph-eye';
+      }
+    }
+
     // Update UI tombol scan berdasarkan tipe presensi terpilih
     function updateScanButtonUI() {
       const tipe = getSelectedTipe();
@@ -603,16 +653,16 @@
       const modalTitle = document.getElementById('modalTitle');
 
       if (tipe === 'Pulang') {
-        btn.innerHTML = '<i class="ph-bold ph-sign-out"></i> Scan Barcode Pulang (Check-Out)';
+        btn.innerHTML = '<i class="ph-bold ph-sign-out"></i> Scan Barcode Posisi (Pulang)';
         btn.classList.add('btn-pulang');
         if (modalTitle) {
-          modalTitle.innerHTML = '<i class="ph-bold ph-sign-out" style="color: #c45a27"></i> Scan Barcode Pulang';
+          modalTitle.innerHTML = '<i class="ph-bold ph-sign-out" style="color: #c45a27"></i> Scan Barcode Posisi (Pulang)';
         }
       } else {
-        btn.innerHTML = '<i class="ph-bold ph-camera"></i> Scan Barcode Masuk (Check-In)';
+        btn.innerHTML = '<i class="ph-bold ph-camera"></i> Scan Barcode Posisi (Masuk)';
         btn.classList.remove('btn-pulang');
         if (modalTitle) {
-          modalTitle.innerHTML = '<i class="ph-bold ph-scan" style="color: var(--pink)"></i> Scan Barcode Masuk';
+          modalTitle.innerHTML = '<i class="ph-bold ph-scan" style="color: var(--pink)"></i> Scan Barcode Posisi (Masuk)';
         }
       }
     }
@@ -626,7 +676,7 @@
     setInterval(updateClock, 1000);
     updateClock();
 
-    // Sound Beep saat scan berhasil (Web Audio API murni)
+    // Sound Beep saat scan berhasil
     function playBeep() {
       try {
         const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -675,7 +725,6 @@
       updateScanButtonUI();
     });
 
-    // Helper mengambil nilai shift & tipe yang dipilih
     function getSelectedShift() {
       const selected = document.querySelector('input[name="shiftRadio"]:checked');
       return selected ? selected.value : '';
@@ -707,8 +756,20 @@
       );
     }
 
-    // Trigger enter on input nama
+    // Navigasi Keyboard Enter
     document.getElementById("idInput").addEventListener("keypress", function(event) {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        const pwd = document.getElementById("passwordInput").value.trim();
+        if (!pwd) {
+          document.getElementById("passwordInput").focus();
+        } else {
+          bukaLiveScanner();
+        }
+      }
+    });
+
+    document.getElementById("passwordInput").addEventListener("keypress", function(event) {
       if (event.key === "Enter") {
         event.preventDefault();
         bukaLiveScanner();
@@ -717,6 +778,7 @@
 
     function validasiFormSebelumScan() {
       const id = document.getElementById('idInput').value.trim();
+      const password = document.getElementById('passwordInput').value.trim();
       const shift = getSelectedShift();
       const output = document.getElementById('output');
       const alertMessage = document.getElementById('alertMessage');
@@ -728,6 +790,15 @@
         alertMessage.innerText = 'Mohon ketik atau pilih Nama Anda terlebih dahulu.';
         output.style.display = 'flex';
         document.getElementById('idInput').focus();
+        return false;
+      }
+
+      if (!password) {
+        output.className = 'alert error';
+        alertIcon.className = 'ph-fill ph-lock-key';
+        alertMessage.innerText = 'Mohon masukkan Password Anda terlebih dahulu.';
+        output.style.display = 'flex';
+        document.getElementById('passwordInput').focus();
         return false;
       }
 
@@ -829,7 +900,7 @@
     }
 
     // ==========================================================
-    // FALLBACK UPLOAD FOTO (DENGAN RESIZE OTOMATIS)
+    // FALLBACK UPLOAD FOTO
     // ==========================================================
     function bukaFotoFallback() {
       if (!validasiFormSebelumScan()) return;
@@ -846,7 +917,7 @@
       output.style.display = 'flex';
       output.className = 'alert warning';
       alertIcon.className = 'ph-bold ph-spinner ph-spin';
-      alertMessage.innerText = 'Mengoptimalkan dan membaca foto barcode...';
+      alertMessage.innerText = 'Mengoptimalkan dan membaca foto barcode posisi...';
 
       const reader = new FileReader();
       reader.onload = function(e) {
@@ -893,6 +964,8 @@
     function kirimPresensi(barcode) {
       const idInput = document.getElementById('idInput');
       const id = idInput.value.trim();
+      const passwordInput = document.getElementById('passwordInput');
+      const password = passwordInput.value.trim();
       const shift = getSelectedShift();
       const tipe = getSelectedTipe();
       
@@ -900,7 +973,7 @@
       const alertMessage = document.getElementById('alertMessage');
       const alertIcon = document.getElementById('alertIcon');
 
-      if (!id || !shift || !barcode) {
+      if (!id || !password || !shift || !barcode) {
         validasiFormSebelumScan();
         return;
       }
@@ -928,11 +1001,12 @@
       output.style.display = 'flex';
       output.className = 'alert warning';
       alertIcon.className = 'ph-bold ph-spinner ph-spin';
-      alertMessage.innerText = 'Sedang memproses presensi ' + tipe + ' ke ' + shift + '...';
+      alertMessage.innerText = 'Memverifikasi password dan barcode posisi ke ' + shift + '...';
 
       const payload = {
         action: 'presensi',
         nama: id,
+        password: password,
         shift: shift,
         tipe: tipe,
         barcode: barcode,
@@ -967,7 +1041,7 @@
             alertIcon.className = 'ph-fill ph-x-circle';
             alertMessage.innerText = 'Gagal terhubung ke server: ' + error.message;
           })
-          .prosesPresensi(id, shift, barcode, userLat, userLng, tipe);
+          .prosesPresensi(id, shift, barcode, userLat, userLng, tipe, password);
       } else {
         output.style.display = 'flex';
         output.className = 'alert error';
@@ -981,6 +1055,7 @@
       const alertMessage = document.getElementById('alertMessage');
       const alertIcon = document.getElementById('alertIcon');
       const idInput = document.getElementById('idInput');
+      const passwordInput = document.getElementById('passwordInput');
 
       output.style.display = 'flex';
       output.className = 'alert ' + res.status;
@@ -989,6 +1064,7 @@
       if (res.status === 'success') {
         alertIcon.className = 'ph-fill ph-check-circle';
         idInput.value = '';
+        passwordInput.value = '';
         
         const radios = document.querySelectorAll('input[name="shiftRadio"]');
         radios.forEach(r => r.checked = false);
@@ -1001,12 +1077,17 @@
         idInput.focus();
       } else if (res.status === 'warning') {
         alertIcon.className = 'ph-fill ph-warning';
-        idInput.value = '';
+        passwordInput.value = '';
         const radios = document.querySelectorAll('input[name="shiftRadio"]');
         radios.forEach(r => r.checked = false);
         idInput.focus();
       } else {
         alertIcon.className = 'ph-fill ph-x-circle';
+        // Jika kesalahan password, fokuskan kembali ke input password
+        if (res.pesan && res.pesan.toLowerCase().includes('password')) {
+          passwordInput.focus();
+          passwordInput.select();
+        }
       }
     }
   </script>

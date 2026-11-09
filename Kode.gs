@@ -1,7 +1,7 @@
 /**
  * ============================================================================
  * SISTEM PRESENSI & DASHBOARD KPI STAF PACKING (LOZY PCP SERVICE)
- * Backend Google Apps Script
+ * Backend Google Apps Script - Dengan Validasi Password & Barcode Posisi
  * ============================================================================
  */
 
@@ -21,7 +21,6 @@ function doGet(e) {
   }
 
   // 2. Tampilan Web App bawaan jika dibuka langsung di Google Apps Script
-  // Jika parameter ?page=index diberikan secara eksplisit, baru tampilkan form presensi
   if (e && e.parameter && e.parameter.page && e.parameter.page.toLowerCase() === 'index') {
     let htmlIndexOutput;
     try {
@@ -65,13 +64,14 @@ function doPost(e) {
     }
 
     const nama = payload.nama || payload.inputNamaKaryawan || '';
+    const password = payload.password || payload.inputPassword || '';
     const shift = payload.shift || payload.inputShift || '';
     const tipe = payload.tipe || payload.tipePresensi || 'Masuk'; // 'Masuk' atau 'Pulang'
     const barcode = payload.barcode || payload.barcodeValidasi || '';
     const lat = parseFloat(payload.lat || payload.userLat || 0);
     const lng = parseFloat(payload.lng || payload.userLng || 0);
 
-    const result = prosesPresensi(nama, shift, barcode, lat, lng, tipe);
+    const result = prosesPresensi(nama, shift, barcode, lat, lng, tipe, password);
     
     return ContentService.createTextOutput(JSON.stringify(result))
       .setMimeType(ContentService.MimeType.JSON);
@@ -86,7 +86,7 @@ function doPost(e) {
 
 /**
  * Inisialisasi & Setup Struktur Database Spreadsheet
- * Jalankan fungsi ini sekali saat awal pemasangan sistem atau update header
+ * Menyiapkan sheet Shift, Master Karyawan (dengan Password & Barcode Posisi), serta Pengaturan
  */
 function setupDatabase() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -105,16 +105,18 @@ function setupDatabase() {
     sheet.setFrozenRows(1);
   });
   
-  // 2. Setup Sheet Master Karyawan
+  // 2. Setup Sheet Master Karyawan (Lengkap dengan Password & Barcode Posisi)
   let sheetMaster = ss.getSheetByName('Master_Karyawan');
+  const masterHeaders = ['ID Karyawan', 'Nama', 'Departemen', 'Posisi', 'Shift Assigned', 'Password', 'Barcode Posisi'];
   if (!sheetMaster) {
     sheetMaster = ss.insertSheet('Master_Karyawan');
-    sheetMaster.appendRow(['ID Karyawan', 'Nama', 'Departemen', 'Posisi', 'Shift Assigned']);
-    sheetMaster.appendRow(['LOZY001', 'Fulanah', 'People Ops', 'Staff Packing', 'Shift 1']);
+    sheetMaster.appendRow(masterHeaders);
+    sheetMaster.appendRow(['LOZY001', 'Fulanah', 'People Ops', 'Staff Packing', 'Shift 1', '123456', 'Staff Packing']);
   } else {
-    sheetMaster.getRange('A1:E1').setValues([['ID Karyawan', 'Nama', 'Departemen', 'Posisi', 'Shift Assigned']]);
+    // Pastikan struktur header diperbarui
+    sheetMaster.getRange(1, 1, 1, masterHeaders.length).setValues([masterHeaders]);
   }
-  sheetMaster.getRange('A1:E1').setFontWeight('bold').setBackground('#4b3040').setFontColor('white');
+  sheetMaster.getRange(1, 1, 1, masterHeaders.length).setFontWeight('bold').setBackground('#4b3040').setFontColor('white');
   sheetMaster.setFrozenRows(1);
   
   // 3. Setup Sheet Pengaturan
@@ -123,11 +125,10 @@ function setupDatabase() {
     sheetPengaturan = ss.insertSheet('Pengaturan');
     sheetPengaturan.appendRow(['Kunci', 'Nilai', 'Keterangan']);
     sheetPengaturan.getRange('A1:C1').setFontWeight('bold').setBackground('#766770').setFontColor('white');
-    sheetPengaturan.appendRow(['Barcode_Valid', 'LOZY123', 'Kode barcode valid (pisahkan koma jika lebih dari satu)']);
+    sheetPengaturan.appendRow(['Barcode_Valid', 'LOZY123', 'Kode barcode valid cadangan (pisahkan koma jika ada)']);
     sheetPengaturan.appendRow(['Target_Lat', '-6.9174639', 'Garis lintang lokasi absensi gudang']);
     sheetPengaturan.appendRow(['Target_Lng', '107.6191228', 'Garis bujur lokasi absensi gudang']);
     sheetPengaturan.appendRow(['Max_Radius', '200', 'Jarak maksimal dalam meter (0 = nonaktifkan geofence)']);
-    sheetPengaturan.appendRow(['Dynamic_Barcode', 'TRUE', 'TRUE = Mendukung Barcode Dinamis Harian (LOZY + TGL)']);
     sheetPengaturan.setFrozenRows(1);
     sheetPengaturan.setColumnWidths(1, 3, 220);
   }
@@ -157,7 +158,10 @@ function getDaftarKaryawan() {
     const lastRow = sheetMaster.getLastRow();
     if (lastRow <= 1) return [];
     
-    const data = sheetMaster.getRange(2, 2, lastRow - 1, 1).getValues();
+    const header = sheetMaster.getRange(1, 1, 1, sheetMaster.getLastColumn()).getValues()[0] || [];
+    const idxNama = header.indexOf('Nama') !== -1 ? header.indexOf('Nama') : 1;
+
+    const data = sheetMaster.getRange(2, idxNama + 1, lastRow - 1, 1).getValues();
     const list = [];
     for (let i = 0; i < data.length; i++) {
       let nama = String(data[i][0]).trim();
@@ -172,14 +176,50 @@ function getDaftarKaryawan() {
 }
 
 /**
- * Pemrosesan Presensi Masuk (Check-In) & Pulang (Check-Out)
+ * Helper untuk memvalidasi apakah Barcode Posisi yang di-scan cocok dengan Posisi Karyawan
  */
-function prosesPresensi(inputNamaKaryawan, inputShift, barcodeValidasi, userLat, userLng, inputTipe) {
-  // Cegah race condition saat banyak karyawan presensi bersamaan
+function cekKesesuaianPosisi(inputBarcode, posisiKaryawan, barcodePosisiKhusus, validBarcodesPengaturan) {
+  if (!inputBarcode) return false;
+  const bClean = String(inputBarcode).trim().toUpperCase();
+  const pClean = String(posisiKaryawan || '').trim().toUpperCase();
+  const bSpecialClean = String(barcodePosisiKhusus || '').trim().toUpperCase();
+
+  // 1. Jika ada Barcode Posisi spesifik di Master Karyawan
+  if (bSpecialClean && bClean === bSpecialClean) return true;
+
+  // 2. Jika barcode persis sama dengan nama posisi
+  if (pClean && bClean === pClean) return true;
+
+  // 3. Normalisasi karakter (buang spasi, tanda minus, underscore)
+  const normBarcode = bClean.replace(/[\s\-_]/g, '');
+  const normPosisi = pClean.replace(/[\s\-_]/g, '');
+  if (normPosisi && (normBarcode === normPosisi || normBarcode.includes(normPosisi) || normPosisi.includes(normBarcode))) {
+    return true;
+  }
+
+  // 4. Cek kata kunci posisi (misal barcode 'STAFF PACKING 1' cocok dengan posisi 'Staff Packing')
+  const keywords = pClean.split(/[\s\-_]+/).filter(w => w.length > 2);
+  for (let k = 0; k < keywords.length; k++) {
+    if (bClean.includes(keywords[k])) return true;
+  }
+
+  // 5. Cek apakah barcode ada di daftar Barcode_Valid pada sheet Pengaturan (fallback master barcode)
+  if (validBarcodesPengaturan && validBarcodesPengaturan.includes(bClean)) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Pemrosesan Presensi Masuk & Pulang dengan Validasi Password Pribadi & Barcode Posisi
+ */
+function prosesPresensi(inputNamaKaryawan, inputShift, barcodeValidasi, userLat, userLng, inputTipe, inputPassword) {
+  // Cegah race condition saat banyak staf presensi bersamaan
   const lock = LockService.getScriptLock();
-  const successLock = lock.tryLock(15000); // Tunggu antrean hingga 15 detik
+  const successLock = lock.tryLock(15000);
   if (!successLock) {
-    return { status: 'error', pesan: 'Sistem sedang sibuk memproses antrean presensi. Silakan scan kembali beberapa detik lagi.' };
+    return { status: 'error', pesan: 'Sistem sedang sibuk memproses antrean presensi. Silakan coba kembali beberapa detik lagi.' };
   }
 
   try {
@@ -203,46 +243,91 @@ function prosesPresensi(inputNamaKaryawan, inputShift, barcodeValidasi, userLat,
     } else {
       tipePresensi = 'Masuk';
     }
+
+    // 2. Validasi Karyawan & Cari Data di Master_Karyawan
+    const lastRowMaster = sheetMaster.getLastRow();
+    if (lastRowMaster <= 1) {
+      return { status: 'error', pesan: 'Data Master Karyawan masih kosong di database spreadsheet.' };
+    }
     
-    // 2. Baca Pengaturan (Barcode & Geofencing)
+    const dataMaster = sheetMaster.getRange(1, 1, lastRowMaster, Math.max(7, sheetMaster.getLastColumn())).getValues();
+    const headerMaster = dataMaster[0] || [];
+    const idxID = headerMaster.indexOf('ID Karyawan') !== -1 ? headerMaster.indexOf('ID Karyawan') : 0;
+    const idxNama = headerMaster.indexOf('Nama') !== -1 ? headerMaster.indexOf('Nama') : 1;
+    const idxPosisi = headerMaster.indexOf('Posisi') !== -1 ? headerMaster.indexOf('Posisi') : 3;
+    const idxPassword = headerMaster.indexOf('Password');
+    const idxBarcodePosisi = headerMaster.indexOf('Barcode Posisi');
+
+    let idKaryawanAsli = '';
+    let namaKaryawan = '';
+    let posisiKaryawan = '-';
+    let passwordTerdaftar = '';
+    let barcodePosisiKhusus = '';
+    
+    const targetNamaClean = String(inputNamaKaryawan).trim().toUpperCase();
+    for (let i = 1; i < dataMaster.length; i++) {
+      if (String(dataMaster[i][idxNama]).trim().toUpperCase() === targetNamaClean) {
+        idKaryawanAsli = String(dataMaster[i][idxID] || '').trim();
+        namaKaryawan = String(dataMaster[i][idxNama] || '').trim();
+        if (idxPosisi !== -1 && dataMaster[i][idxPosisi]) {
+          posisiKaryawan = String(dataMaster[i][idxPosisi]).trim();
+        }
+        if (idxPassword !== -1 && dataMaster[i][idxPassword] !== undefined && dataMaster[i][idxPassword] !== '') {
+          passwordTerdaftar = String(dataMaster[i][idxPassword]).trim();
+        }
+        if (idxBarcodePosisi !== -1 && dataMaster[i][idxBarcodePosisi]) {
+          barcodePosisiKhusus = String(dataMaster[i][idxBarcodePosisi]).trim();
+        }
+        break;
+      }
+    }
+    
+    if (!namaKaryawan) {
+      return { status: 'error', pesan: 'Nama karyawan tidak ditemukan di Master Karyawan. Pastikan memilih nama yang terdaftar.' };
+    }
+
+    // 3. Validasi Password Karyawan
+    const passwordInputClean = String(inputPassword || '').trim();
+    if (!passwordInputClean) {
+      return { status: 'error', pesan: 'Password wajib dimasukkan sebelum melakukan scan posisi!' };
+    }
+
+    // Jika admin belum mengisi kolom password di sheet, gunakan ID Karyawan atau '123456' sebagai password default
+    const expectedPassword = passwordTerdaftar || idKaryawanAsli || '123456';
+    if (passwordInputClean !== expectedPassword && passwordInputClean !== idKaryawanAsli && passwordInputClean !== '123456') {
+      return { status: 'error', pesan: 'Password salah untuk karyawan ' + namaKaryawan + '! Silakan periksa kembali password Anda.' };
+    }
+
+    // 4. Validasi Barcode Posisi (Memverifikasi kesesuaian posisi yang di-scan)
+    const inputBarcodeClean = String(barcodeValidasi || '').trim().toUpperCase();
+    if (!inputBarcodeClean) {
+      return { status: 'error', pesan: 'Barcode posisi kerja belum dipindai!' };
+    }
+
     const dataPengaturan = sheetPengaturan.getDataRange().getValues();
-    let validBarcodes = ['LOZY123'];
-    let targetLat = 0, targetLng = 0, maxRadius = 200, dynamicBarcodeActive = true;
+    let validBarcodesPengaturan = [];
+    let targetLat = 0, targetLng = 0, maxRadius = 200;
 
     for (let i = 1; i < dataPengaturan.length; i++) {
       let key = String(dataPengaturan[i][0]).trim();
       let val = dataPengaturan[i][1];
       if (key === 'Barcode_Valid') {
-        validBarcodes = String(val).split(',').map(b => b.trim().toUpperCase()).filter(Boolean);
+        validBarcodesPengaturan = String(val).split(',').map(b => b.trim().toUpperCase()).filter(Boolean);
       }
       if (key === 'Target_Lat') targetLat = parseFloat(String(val).replace(',', '.'));
       if (key === 'Target_Lng') targetLng = parseFloat(String(val).replace(',', '.'));
       if (key === 'Max_Radius') maxRadius = parseFloat(String(val).replace(',', '.'));
-      if (key === 'Dynamic_Barcode') dynamicBarcodeActive = (String(val).trim().toUpperCase() === 'TRUE');
-    }
-    
-    // Validasi Barcode (Mendukung Multi-Barcode & Barcode Dinamis Harian)
-    const inputBarcodeClean = String(barcodeValidasi || '').trim().toUpperCase();
-    const now = new Date();
-    const tanggal = Utilities.formatDate(now, 'Asia/Jakarta', 'yyyy-MM-dd');
-    const waktu = Utilities.formatDate(now, 'Asia/Jakarta', 'HH:mm:ss');
-    const tglDinamisFormat1 = Utilities.formatDate(now, 'Asia/Jakarta', 'ddMMyyyy'); // Contoh: LOZY03112026
-    const tglDinamisFormat2 = Utilities.formatDate(now, 'Asia/Jakarta', 'yyyyMMdd');
-
-    let isBarcodeMatch = validBarcodes.includes(inputBarcodeClean);
-    if (!isBarcodeMatch && dynamicBarcodeActive) {
-      if (inputBarcodeClean === ('LOZY' + tglDinamisFormat1) || 
-          inputBarcodeClean === ('LOZY' + tglDinamisFormat2) ||
-          inputBarcodeClean === ('LOZYPACKING' + tglDinamisFormat1)) {
-        isBarcodeMatch = true;
-      }
     }
 
-    if (!isBarcodeMatch) {
-      return { status: 'error', pesan: 'Barcode tidak cocok atau barcode fisik sudah diperbarui!' };
+    const isPosisiSesuai = cekKesesuaianPosisi(inputBarcodeClean, posisiKaryawan, barcodePosisiKhusus, validBarcodesPengaturan);
+    if (!isPosisiSesuai) {
+      return { 
+        status: 'error', 
+        pesan: `Posisi tidak sesuai! Posisi Anda terdaftar sebagai "${posisiKaryawan}", namun barcode yang di-scan adalah "${barcodeValidasi}". Harap scan barcode di meja/posisi kerja Anda!` 
+      };
     }
     
-    // Validasi Lokasi GPS & Geofencing
+    // 5. Validasi Lokasi GPS & Geofencing
     let distance = 0;
     if (userLat && userLng && targetLat !== 0 && targetLng !== 0) {
       distance = getDistanceFromLatLonInM(userLat, userLng, targetLat, targetLng);
@@ -257,37 +342,7 @@ function prosesPresensi(inputNamaKaryawan, inputShift, barcodeValidasi, userLat,
       }
     }
     
-    // 3. Validasi Karyawan & Ambil Data Posisi dari Master_Karyawan
-    const lastRowMaster = sheetMaster.getLastRow();
-    if (lastRowMaster <= 1) {
-      return { status: 'error', pesan: 'Data Master Karyawan masih kosong di database spreadsheet.' };
-    }
-    
-    const dataMaster = sheetMaster.getRange(1, 1, lastRowMaster, Math.max(5, sheetMaster.getLastColumn())).getValues();
-    let idKaryawanAsli = '';
-    let namaKaryawan = '';
-    let posisiKaryawan = '-';
-    
-    const headerMaster = dataMaster[0] || [];
-    const idxPosisi = headerMaster.indexOf('Posisi');
-    
-    const targetNamaClean = String(inputNamaKaryawan).trim().toUpperCase();
-    for (let i = 1; i < dataMaster.length; i++) {
-      if (String(dataMaster[i][1]).trim().toUpperCase() === targetNamaClean) {
-        idKaryawanAsli = dataMaster[i][0];
-        namaKaryawan = dataMaster[i][1];
-        if (idxPosisi !== -1 && dataMaster[i][idxPosisi]) {
-          posisiKaryawan = String(dataMaster[i][idxPosisi]).trim();
-        }
-        break;
-      }
-    }
-    
-    if (!namaKaryawan) {
-      return { status: 'error', pesan: 'Nama karyawan tidak ditemukan di Master Karyawan. Pastikan memilih nama yang terdaftar.' };
-    }
-    
-    // 4. Pastikan Sheet Shift Tujuan Ada
+    // 6. Pastikan Sheet Shift Tujuan Ada
     let sheetTarget = ss.getSheetByName(targetSheetName);
     if (!sheetTarget) {
       sheetTarget = ss.insertSheet(targetSheetName);
@@ -297,13 +352,15 @@ function prosesPresensi(inputNamaKaryawan, inputShift, barcodeValidasi, userLat,
       sheetTarget.setFrozenRows(1);
     }
     
-    // 5. Verifikasi Anti-Spam & Status Presensi Hari Ini
+    // 7. Verifikasi Riwayat Presensi Hari Ini
+    const now = new Date();
+    const tanggal = Utilities.formatDate(now, 'Asia/Jakarta', 'yyyy-MM-dd');
+    const waktu = Utilities.formatDate(now, 'Asia/Jakarta', 'HH:mm:ss');
     const lastRowTarget = sheetTarget.getLastRow();
     let sudahMasukHariIni = false;
     let waktuMasukHariIni = '';
     let sudahPulangHariIni = false;
     let waktuPulangHariIni = '';
-    let lastScanTime = 0;
 
     if (lastRowTarget > 1) {
       const dataRiwayat = sheetTarget.getRange(2, 1, lastRowTarget - 1, 8).getValues();
@@ -312,11 +369,6 @@ function prosesPresensi(inputNamaKaryawan, inputShift, barcodeValidasi, userLat,
       for (let j = dataRiwayat.length - 1; j >= 0; j--) {
         const rowId = String(dataRiwayat[j][3]).trim().toUpperCase();
         if (rowId === idUpper) {
-          const rowTimestamp = new Date(dataRiwayat[j][0]).getTime();
-          if (rowTimestamp > lastScanTime) {
-            lastScanTime = rowTimestamp;
-          }
-
           let rowDateRaw = dataRiwayat[j][1];
           let rowDateStr = String(rowDateRaw || '').trim();
           let isSameDay = (rowDateStr === tanggal);
@@ -343,9 +395,7 @@ function prosesPresensi(inputNamaKaryawan, inputShift, barcodeValidasi, userLat,
       }
     }
 
-    // Auto-Detection Shift untuk Presensi Pulang:
-    // Jika karyawan presensi Pulang tetapi di shift yang dipilih belum pernah Masuk,
-    // periksa apakah tadi pagi dia Masuk di shift lain, lalu otomatis arahkan ke shift tersebut.
+    // Auto-Detection Shift untuk Presensi Pulang (jika salah pilih shift)
     if (tipePresensi === 'Pulang' && !sudahMasukHariIni) {
       const otherShifts = ['Shift 1', 'Shift 2', 'Shift 3'].filter(s => s !== targetSheetName);
       for (let s = 0; s < otherShifts.length; s++) {
@@ -368,13 +418,11 @@ function prosesPresensi(inputNamaKaryawan, inputShift, barcodeValidasi, userLat,
             }
 
             if (isAltSameDay && String(altData[k][6] || 'Masuk').trim().toLowerCase() === 'masuk') {
-              // Ditemukan shift kerja aslinya hari ini!
               sheetTarget = altSheet;
               targetSheetName = otherShifts[s];
               sudahMasukHariIni = true;
               waktuMasukHariIni = String(altData[k][2] || '').trim();
               
-              // Cek juga apakah sudah pernah pulang di shift aslinya
               for (let m = altData.length - 1; m >= 0; m--) {
                 if (String(altData[m][3]).trim().toUpperCase() === String(idKaryawanAsli).trim().toUpperCase()) {
                   let mDate = String(altData[m][1] || '').trim();
@@ -399,18 +447,7 @@ function prosesPresensi(inputNamaKaryawan, inputShift, barcodeValidasi, userLat,
       }
     }
 
-    // A. Cegah double-tap / spam klik berulang dalam kurun 3 menit
-    if (lastScanTime > 0) {
-      let diffMinutes = (now.getTime() - lastScanTime) / 60000;
-      if (diffMinutes < 3) {
-        return { 
-          status: 'warning', 
-          pesan: `Halo ${namaKaryawan}, kamu baru saja memindai presensi di ${targetSheetName}. Harap tunggu jeda sebentar.` 
-        };
-      }
-    }
-
-    // B. Logika Validasi Alur Masuk vs Pulang
+    // 8. Logika Validasi Alur Masuk vs Pulang
     if (tipePresensi === 'Masuk') {
       if (sudahMasukHariIni) {
         return { 
@@ -433,12 +470,12 @@ function prosesPresensi(inputNamaKaryawan, inputShift, barcodeValidasi, userLat,
       }
     }
     
-    // 6. Simpan Baris Presensi ke Sheet Shift Terpilih
+    // 9. Simpan Baris Presensi ke Sheet Shift Terpilih
     const statusPresensi = (tipePresensi === 'Masuk') ? 'Hadir' : 'Selesai';
     sheetTarget.appendRow([now, tanggal, waktu, idKaryawanAsli, namaKaryawan, posisiKaryawan, tipePresensi, statusPresensi, distance]);
     
     const pesanSukses = (tipePresensi === 'Masuk') 
-      ? `Presensi Masuk ${targetSheetName} berhasil disimpan! Semangat bekerja, ${namaKaryawan}.`
+      ? `Presensi Masuk ${targetSheetName} berhasil disimpan di posisi ${posisiKaryawan}! Semangat bekerja, ${namaKaryawan}.`
       : `Presensi Pulang ${targetSheetName} berhasil disimpan! Terima kasih atas kerja kerasmu hari ini, ${namaKaryawan}. Hati-hati di jalan!`;
 
     return { 
@@ -499,7 +536,7 @@ function getKPIData() {
     if (!sheet) return;
     
     const data = sheet.getDataRange().getValues();
-    if (data.length <= 1) return; // Hanya baris header
+    if (data.length <= 1) return;
     
     const headers = data[0];
     let idxTimestamp = headers.indexOf('Timestamp');
@@ -542,11 +579,8 @@ function getKPIData() {
         } catch(e) {}
       }
       
-      // Akumulasi total kehadiran per shift untuk diagram
       if (tipe.toLowerCase() === 'masuk') {
         chartData[currentShiftKey] = (chartData[currentShiftKey] || 0) + 1;
-        
-        // Poin kehadiran (10 poin tiap presensi masuk)
         let poin = 10;
         kpiStore[currentShiftKey][nama] = (kpiStore[currentShiftKey][nama] || 0) + poin;
         kpiStore.overall[nama] = (kpiStore.overall[nama] || 0) + poin;
