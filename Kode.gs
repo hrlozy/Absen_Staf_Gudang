@@ -307,6 +307,8 @@ function prosesPresensi(inputNamaKaryawan, inputShift, barcodeValidasi, userLat,
     }
 
     const now = new Date();
+    const tanggal = Utilities.formatDate(now, 'Asia/Jakarta', 'yyyy-MM-dd');
+    const waktu = Utilities.formatDate(now, 'Asia/Jakarta', 'HH:mm:ss');
     const tglDinamisFormat1 = Utilities.formatDate(now, 'Asia/Jakarta', 'ddMMyyyy');
     const tglDinamisFormat2 = Utilities.formatDate(now, 'Asia/Jakarta', 'yyyyMMdd');
 
@@ -352,9 +354,6 @@ function prosesPresensi(inputNamaKaryawan, inputShift, barcodeValidasi, userLat,
     }
     
     // 7. Verifikasi Riwayat Presensi Hari Ini
-    const now = new Date();
-    const tanggal = Utilities.formatDate(now, 'Asia/Jakarta', 'yyyy-MM-dd');
-    const waktu = Utilities.formatDate(now, 'Asia/Jakarta', 'HH:mm:ss');
     const lastRowTarget = sheetTarget.getLastRow();
     let sudahMasukHariIni = false;
     let waktuMasukHariIni = '';
