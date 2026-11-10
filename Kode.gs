@@ -176,46 +176,7 @@ function getDaftarKaryawan() {
 }
 
 /**
- * Helper untuk memvalidasi apakah Barcode Posisi yang di-scan cocok dengan Posisi Karyawan
- */
-function cekKesesuaianPosisi(inputBarcode, posisiKaryawan, barcodePosisiKhusus, validBarcodesPengaturan) {
-  if (!inputBarcode) return false;
-  const bClean = String(inputBarcode).trim().toUpperCase();
-  const pClean = String(posisiKaryawan || '').trim().toUpperCase();
-  const bSpecialClean = String(barcodePosisiKhusus || '').trim().toUpperCase();
-
-  // 0. Jika posisi karyawan di Master belum diatur / masih '-'
-  if (!pClean || pClean === '-') return true;
-
-  // 1. Jika ada Barcode Posisi spesifik di Master Karyawan
-  if (bSpecialClean && bClean === bSpecialClean) return true;
-
-  // 2. Jika barcode persis sama dengan nama posisi
-  if (pClean && bClean === pClean) return true;
-
-  // 3. Normalisasi karakter (buang spasi, tanda minus, underscore)
-  const normBarcode = bClean.replace(/[\s\-_]/g, '');
-  const normPosisi = pClean.replace(/[\s\-_]/g, '');
-  if (normPosisi && (normBarcode === normPosisi || normBarcode.includes(normPosisi) || normPosisi.includes(normBarcode))) {
-    return true;
-  }
-
-  // 4. Cek kata kunci posisi (misal barcode 'STAFF PACKING 1' cocok dengan posisi 'Staff Packing')
-  const keywords = pClean.split(/[\s\-_]+/).filter(w => w.length > 2);
-  for (let k = 0; k < keywords.length; k++) {
-    if (bClean.includes(keywords[k])) return true;
-  }
-
-  // 5. Cek apakah barcode ada di daftar Barcode_Valid pada sheet Pengaturan (fallback master barcode)
-  if (validBarcodesPengaturan && validBarcodesPengaturan.includes(bClean)) {
-    return true;
-  }
-
-  return false;
-}
-
-/**
- * Pemrosesan Presensi Masuk & Pulang dengan Validasi Password Pribadi & Barcode Posisi
+ * Pemrosesan Presensi Masuk & Pulang dengan Validasi Password Pribadi (Kolom G) & 1 Barcode Validasi
  */
 function prosesPresensi(inputNamaKaryawan, inputShift, barcodeValidasi, userLat, userLng, inputTipe, inputPassword) {
   // Cegah race condition saat banyak staf presensi bersamaan
@@ -321,32 +282,47 @@ function prosesPresensi(inputNamaKaryawan, inputShift, barcodeValidasi, userLat,
       }
     }
 
-    // 4. Validasi Barcode Posisi (Memverifikasi kesesuaian posisi yang di-scan)
+    // 4. Validasi Barcode Presensi (1 Barcode untuk Seluruh Karyawan)
     const inputBarcodeClean = String(barcodeValidasi || '').trim().toUpperCase();
     if (!inputBarcodeClean) {
-      return { status: 'error', pesan: 'Barcode posisi kerja belum dipindai!' };
+      return { status: 'error', pesan: 'Barcode validasi belum dipindai!' };
     }
 
     const dataPengaturan = sheetPengaturan.getDataRange().getValues();
-    let validBarcodesPengaturan = [];
-    let targetLat = 0, targetLng = 0, maxRadius = 200;
+    let validBarcodes = ['LOZY123'];
+    let targetLat = 0, targetLng = 0, maxRadius = 200, dynamicBarcodeActive = true;
 
     for (let i = 1; i < dataPengaturan.length; i++) {
       let key = String(dataPengaturan[i][0]).trim();
+      let keyNorm = key.replace(/[\s_]/g, '').toLowerCase();
       let val = dataPengaturan[i][1];
-      if (key === 'Barcode_Valid') {
-        validBarcodesPengaturan = String(val).split(',').map(b => b.trim().toUpperCase()).filter(Boolean);
+
+      if (keyNorm === 'barcodevalid' || keyNorm === 'barcode') {
+        validBarcodes = String(val).split(',').map(b => b.trim().toUpperCase()).filter(Boolean);
       }
-      if (key === 'Target_Lat') targetLat = parseFloat(String(val).replace(',', '.'));
-      if (key === 'Target_Lng') targetLng = parseFloat(String(val).replace(',', '.'));
-      if (key === 'Max_Radius') maxRadius = parseFloat(String(val).replace(',', '.'));
+      if (keyNorm === 'targetlat' || key === 'Target_Lat') targetLat = parseFloat(String(val).replace(',', '.'));
+      if (keyNorm === 'targetlng' || key === 'Target_Lng') targetLng = parseFloat(String(val).replace(',', '.'));
+      if (keyNorm === 'maxradius' || key === 'Max_Radius') maxRadius = parseFloat(String(val).replace(',', '.'));
+      if (keyNorm === 'dynamicbarcode' || key === 'Dynamic_Barcode') dynamicBarcodeActive = (String(val).trim().toUpperCase() === 'TRUE');
     }
 
-    const isPosisiSesuai = cekKesesuaianPosisi(inputBarcodeClean, posisiKaryawan, barcodePosisiKhusus, validBarcodesPengaturan);
-    if (!isPosisiSesuai) {
+    const now = new Date();
+    const tglDinamisFormat1 = Utilities.formatDate(now, 'Asia/Jakarta', 'ddMMyyyy');
+    const tglDinamisFormat2 = Utilities.formatDate(now, 'Asia/Jakarta', 'yyyyMMdd');
+
+    let isBarcodeMatch = validBarcodes.includes(inputBarcodeClean);
+    if (!isBarcodeMatch && dynamicBarcodeActive) {
+      if (inputBarcodeClean === ('LOZY' + tglDinamisFormat1) || 
+          inputBarcodeClean === ('LOZY' + tglDinamisFormat2) ||
+          inputBarcodeClean === ('LOZYPACKING' + tglDinamisFormat1)) {
+        isBarcodeMatch = true;
+      }
+    }
+
+    if (!isBarcodeMatch) {
       return { 
         status: 'error', 
-        pesan: `Posisi tidak sesuai! Posisi Anda terdaftar sebagai "${posisiKaryawan}", namun barcode yang di-scan adalah "${barcodeValidasi}". Harap scan barcode di meja/posisi kerja Anda!` 
+        pesan: 'Barcode validasi tidak cocok atau salah! Pastikan memindai barcode presensi resmi gudang.' 
       };
     }
     
@@ -497,8 +473,9 @@ function prosesPresensi(inputNamaKaryawan, inputShift, barcodeValidasi, userLat,
     const statusPresensi = (tipePresensi === 'Masuk') ? 'Hadir' : 'Selesai';
     sheetTarget.appendRow([now, tanggal, waktu, idKaryawanAsli, namaKaryawan, posisiKaryawan, tipePresensi, statusPresensi, distance]);
     
+    const labelPosisi = (posisiKaryawan && posisiKaryawan !== '-') ? ` (${posisiKaryawan})` : '';
     const pesanSukses = (tipePresensi === 'Masuk') 
-      ? `Presensi Masuk ${targetSheetName} berhasil disimpan di posisi ${posisiKaryawan}! Semangat bekerja, ${namaKaryawan}.`
+      ? `Presensi Masuk ${targetSheetName} berhasil disimpan${labelPosisi}! Semangat bekerja, ${namaKaryawan}.`
       : `Presensi Pulang ${targetSheetName} berhasil disimpan! Terima kasih atas kerja kerasmu hari ini, ${namaKaryawan}. Hati-hati di jalan!`;
 
     return { 

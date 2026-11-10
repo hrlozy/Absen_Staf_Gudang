@@ -510,7 +510,7 @@
   <div class="card">
     <div class="eyebrow">PCP Service</div>
     <h2>Presensi Packing</h2>
-    <p class="subtitle">Pilih nama, masukkan password Anda, lalu scan barcode posisi kerja Anda.</p>
+    <p class="subtitle">Pilih nama, masukkan password pribadi Anda, lalu scan barcode presensi.</p>
 
     <!-- 1. Input Nama Karyawan dengan Autocomplete -->
     <label class="input-label" for="idInput">Nama Karyawan:</label>
@@ -578,9 +578,9 @@
       </div>
     </div>
 
-    <!-- 5. Tombol Utama Scan Barcode Posisi -->
+    <!-- 5. Tombol Utama Scan Barcode -->
     <button id="btnScan" class="btn btn-primary" onclick="bukaLiveScanner()">
-      <i class="ph-bold ph-camera"></i> Scan Barcode Posisi (Masuk)
+      <i class="ph-bold ph-camera"></i> Scan Barcode Presensi (Masuk)
     </button>
 
     <!-- Fallback Foto Manual jika kamera bermasalah di perangkat lama -->
@@ -605,7 +605,7 @@
     <div class="modal-box">
       <div class="modal-header">
         <span class="modal-title" id="modalTitle">
-          <i class="ph-bold ph-scan" style="color: var(--pink)"></i> Scan Barcode Posisi
+          <i class="ph-bold ph-scan" style="color: var(--pink)"></i> Scan Barcode Presensi
         </span>
         <button class="modal-close-btn" onclick="tutupLiveScanner()">
           <i class="ph-bold ph-x"></i>
@@ -618,7 +618,7 @@
       </div>
       
       <p class="scanner-tip" id="scannerTip">
-        Arahkan kamera tepat ke Barcode Posisi kerja Anda. Sistem memverifikasi kesesuaian posisi secara otomatis.
+        Posisikan Barcode Presensi tepat di tengah area kamera. Scanner membaca otomatis secara real-time.
       </p>
       
       <button class="btn btn-secondary" onclick="tutupLiveScanner()">
@@ -653,16 +653,16 @@
       const modalTitle = document.getElementById('modalTitle');
 
       if (tipe === 'Pulang') {
-        btn.innerHTML = '<i class="ph-bold ph-sign-out"></i> Scan Barcode Posisi (Pulang)';
+        btn.innerHTML = '<i class="ph-bold ph-sign-out"></i> Scan Barcode Presensi (Pulang)';
         btn.classList.add('btn-pulang');
         if (modalTitle) {
-          modalTitle.innerHTML = '<i class="ph-bold ph-sign-out" style="color: #c45a27"></i> Scan Barcode Posisi (Pulang)';
+          modalTitle.innerHTML = '<i class="ph-bold ph-sign-out" style="color: #c45a27"></i> Scan Barcode Presensi (Pulang)';
         }
       } else {
-        btn.innerHTML = '<i class="ph-bold ph-camera"></i> Scan Barcode Posisi (Masuk)';
+        btn.innerHTML = '<i class="ph-bold ph-camera"></i> Scan Barcode Presensi (Masuk)';
         btn.classList.remove('btn-pulang');
         if (modalTitle) {
-          modalTitle.innerHTML = '<i class="ph-bold ph-scan" style="color: var(--pink)"></i> Scan Barcode Posisi (Masuk)';
+          modalTitle.innerHTML = '<i class="ph-bold ph-scan" style="color: var(--pink)"></i> Scan Barcode Presensi (Masuk)';
         }
       }
     }

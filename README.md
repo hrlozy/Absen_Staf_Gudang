@@ -3,8 +3,8 @@
 Sistem Presensi & Dashboard KPI Staf Packing Gudang (LOZY PCP Service).
 
 ## Fitur Utama
-- **Autentikasi Password Pribadi**: Setiap staf wajib memasukkan password/PIN pribadi mereka sebelum dapat melakukan pemindaian presensi. Password tersimpan aman pada sheet `Master_Karyawan`.
-- **Verifikasi Barcode Posisi Kerja**: Pemindaian kamera memvalidasi Barcode Posisi di meja/stasiun kerja staf. Presensi hanya berhasil jika barcode yang dipindai sesuai dengan Posisi staf yang terdaftar di database.
+- **Autentikasi Password Pribadi**: Setiap staf wajib memasukkan password/PIN pribadi mereka (Kolom G) sebelum dapat melakukan pemindaian presensi.
+- **1 Barcode Validasi Gudang**: Seluruh staf memindai 1 barcode presensi resmi yang sama (diatur pada sheet `Pengaturan`). Posisi staf tetap tercatat secara otomatis sesuai data di `Master_Karyawan`.
 - **Presensi Dual-Mode**: Mendukung presensi **Masuk (Check-In)** dan **Pulang (Check-Out)** dengan auto-detect shift kerja cerdas.
 - **Live Barcode / QR Scanner**: Berbasis kamera WebRTC real-time dengan laser guidance + audio feedback beep, serta opsi fallback foto jika kamera perangkat terkendala.
 - **Validasi Geofencing**: Menggunakan formula Haversine untuk menghitung radius jarak fisik staf ke gudang secara presisi.
@@ -22,6 +22,6 @@ Sistem Presensi & Dashboard KPI Staf Packing Gudang (LOZY PCP Service).
 | LOZY001 | Fulanah | People Ops | Staff Packing | Shift 1 | Staff Packing | 123456 |
 
 ## Struktur File
-- [`index.html`](index.html): Halaman antarmuka presensi staf gudang (input nama, input password pribadi, selector tipe presensi & shift, live scanner posisi).
+- [`index.html`](index.html): Halaman antarmuka presensi staf gudang (input nama, input password pribadi, selector tipe presensi & shift, live scanner presensi).
 - [`dashboard.html`](dashboard.html): Halaman dashboard monitoring kedisiplinan, leaderboard poin, log aktivitas harian, dan ekspor CSV.
-- [`Kode.gs`](Kode.gs): Script backend Google Apps Script yang menangani verifikasi password, validasi barcode posisi, geofencing, routing API, dan rekaman spreadsheet.
+- [`Kode.gs`](Kode.gs): Script backend Google Apps Script yang menangani verifikasi password (Kolom G), validasi 1 barcode presensi, geofencing, routing API, dan rekaman spreadsheet.
