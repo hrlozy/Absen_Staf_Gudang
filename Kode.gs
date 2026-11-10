@@ -289,7 +289,7 @@ function prosesPresensi(inputNamaKaryawan, inputShift, barcodeValidasi, userLat,
     }
 
     const dataPengaturan = sheetPengaturan.getDataRange().getValues();
-    let validBarcodes = ['LOZY123'];
+    let validBarcodes = ['LOZY123', 'PACKING AREA', 'PACKINGAREA', 'ABSENSI DAILY WORKER'];
     let targetLat = 0, targetLng = 0, maxRadius = 200, dynamicBarcodeActive = true;
 
     for (let i = 1; i < dataPengaturan.length; i++) {
@@ -298,7 +298,8 @@ function prosesPresensi(inputNamaKaryawan, inputShift, barcodeValidasi, userLat,
       let val = dataPengaturan[i][1];
 
       if (keyNorm === 'barcodevalid' || keyNorm === 'barcode') {
-        validBarcodes = String(val).split(',').map(b => b.trim().toUpperCase()).filter(Boolean);
+        const customCodes = String(val).split(',').map(b => b.trim().toUpperCase()).filter(Boolean);
+        validBarcodes = validBarcodes.concat(customCodes);
       }
       if (keyNorm === 'targetlat' || key === 'Target_Lat') targetLat = parseFloat(String(val).replace(',', '.'));
       if (keyNorm === 'targetlng' || key === 'Target_Lng') targetLng = parseFloat(String(val).replace(',', '.'));
@@ -312,7 +313,12 @@ function prosesPresensi(inputNamaKaryawan, inputShift, barcodeValidasi, userLat,
     const tglDinamisFormat1 = Utilities.formatDate(now, 'Asia/Jakarta', 'ddMMyyyy');
     const tglDinamisFormat2 = Utilities.formatDate(now, 'Asia/Jakarta', 'yyyyMMdd');
 
-    let isBarcodeMatch = validBarcodes.includes(inputBarcodeClean);
+    let isBarcodeMatch = validBarcodes.includes(inputBarcodeClean) || 
+                         validBarcodes.includes(inputBarcodeClean.replace(/\s+/g, '')) ||
+                         inputBarcodeClean === 'PACKING AREA' ||
+                         inputBarcodeClean === 'ABSENSI DAILY WORKER' ||
+                         inputBarcodeClean === 'LOZY123';
+
     if (!isBarcodeMatch && dynamicBarcodeActive) {
       if (inputBarcodeClean === ('LOZY' + tglDinamisFormat1) || 
           inputBarcodeClean === ('LOZY' + tglDinamisFormat2) ||
